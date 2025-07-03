@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const authRoute = require('./routes/authRoute');
+const userRoutes = require('./routes/userRoute');
 const connectDB = require('./config/db');
 
 // Load environment variables
@@ -19,6 +20,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api/auth', authRoute);
+app.use('/api/users', userRoutes);
 
 // Basic route
 app.get('/', (req, res) => {
