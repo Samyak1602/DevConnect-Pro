@@ -32,7 +32,7 @@ const userSchema = new mongoose.Schema({
     },
     avatar: {
         type: String,
-        default: 'https://www.google.com/imgres?q=avatar%20image%20png&imgurl=https%3A%2F%2Ftoppng.com%2Fuploads%2Fpreview%2Favatar-png-115540218987bthtxfhls.png&imgrefurl=https%3A%2F%2Ftoppng.com%2Ffree-image%2Favatar-png-PNG-free-PNG-Images_140622&docid=I4z_OfsfGAw-pM&tbnid=Gruu3znkNFO40M&vet=12ahUKEwjyjbfLmKGOAxU2b2wGHa6aOn8QM3oECG4QAA..i&w=840&h=859&hcb=2&ved=2ahUKEwjyjbfLmKGOAxU2b2wGHa6aOn8QM3oECG4QAA'
+        default: 'https://via.placeholder.com/150x150.png?text=Avatar'
     },
     skills: [{
         type: String,
