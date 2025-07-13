@@ -15,10 +15,16 @@ exports.register = async (req,res,next) => {
             return res.status(400).json({message: 'Password must be at least 6 characters long'});
         }
 
-        const existing = await User.findOne({email});
+        // Check for existing email
+        const existingEmail = await User.findOne({email});
+        if(existingEmail){
+            return res.status(400).json({message:'This email address is already registered. Please use a different email or try logging in.'});
+        }
 
-        if(existing){
-            return res.status(400).json({message:'Email already in use'});
+        // Check for existing username
+        const existingUsername = await User.findOne({username});
+        if(existingUsername){
+            return res.status(400).json({message:'This username is already taken. Please choose a different username.'});
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -47,6 +53,16 @@ exports.register = async (req,res,next) => {
             }
         });
     }catch(err){
+        // Handle MongoDB duplicate key errors as fallback
+        if (err.code === 11000) {
+            if (err.keyPattern && err.keyPattern.email) {
+                return res.status(400).json({message: 'This email address is already registered. Please use a different email or try logging in.'});
+            }
+            if (err.keyPattern && err.keyPattern.username) {
+                return res.status(400).json({message: 'This username is already taken. Please choose a different username.'});
+            }
+            return res.status(400).json({message: 'An account with this information already exists.'});
+        }
         next(err);
     }
 }
