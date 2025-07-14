@@ -1,7 +1,7 @@
-import React, { useEffect } from 'react'
+import React from 'react'
 import { useSelector, useDispatch } from 'react-redux'
-import { useNavigate } from 'react-router-dom'
-import { selectUser, selectIsAuthenticated } from '../features/auth/authSlice'
+import { useNavigate, Link } from 'react-router-dom'
+import { selectUser } from '../features/auth/authSlice'
 import { logoutUser } from '../features/auth/authService'
 import { User, LogOut, Code2, Users, FolderOpen, Settings } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -10,14 +10,6 @@ const Home = () => {
   const navigate = useNavigate()
   const dispatch = useDispatch()
   const user = useSelector(selectUser)
-  const isAuthenticated = useSelector(selectIsAuthenticated)
-
-  useEffect(() => {
-    // Redirect to login if not authenticated
-    if (!isAuthenticated) {
-      navigate('/login', { replace: true })
-    }
-  }, [isAuthenticated, navigate])
 
   const handleLogout = async () => {
     try {
@@ -34,18 +26,6 @@ const Home = () => {
         position: 'top-center',
       })
     }
-  }
-
-  // Show loading or redirect if not authenticated
-  if (!isAuthenticated || !user) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="loading loading-spinner loading-lg text-indigo-600"></div>
-          <p className="text-slate-600 mt-4">Loading your dashboard...</p>
-        </div>
-      </div>
-    )
   }
 
   return (
@@ -103,10 +83,10 @@ const Home = () => {
                 </p>
               </div>
               <div className="card-actions justify-end mt-4">
-                <button className="btn btn-primary btn-sm">
+                <Link to="/profile" className="btn btn-primary btn-sm">
                   <Settings className="h-4 w-4 mr-1" />
                   Edit Profile
-                </button>
+                </Link>
               </div>
             </div>
           </div>

@@ -1,5 +1,5 @@
 import React, { useState } from "react"
-import { Link, useNavigate } from "react-router-dom"
+import { Link, useNavigate, useLocation } from "react-router-dom"
 import { useDispatch, useSelector } from "react-redux"
 import { Code2, Github, Mail, Eye, EyeOff, ArrowLeft, LogIn, User, AlertCircle } from "lucide-react"
 import { loginUser } from "../features/auth/authService"
@@ -8,6 +8,7 @@ import toast, { Toaster } from 'react-hot-toast'
 
 const Login = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   const dispatch = useDispatch()
   const loading = useSelector(selectAuthLoading)
   const authError = useSelector(selectAuthError)
@@ -19,6 +20,9 @@ const Login = () => {
     password: "",
     rememberMe: false,
   })
+
+  // Get the intended destination from location state or default to home
+  const from = location.state?.from?.pathname || '/home'
 
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -52,8 +56,8 @@ const Login = () => {
         position: 'top-center',
       })
 
-      // Navigate to home page
-      navigate('/home', { replace: true })
+      // Navigate to intended destination or home page
+      navigate(from, { replace: true })
       
     } catch (error) {
       console.error('Login error:', error)
