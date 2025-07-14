@@ -1,14 +1,19 @@
 import React, { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
+import { useDispatch, useSelector } from "react-redux"
 import { Code2, Github, Mail, Eye, EyeOff, ArrowLeft, Check, User, AlertCircle } from "lucide-react"
-import { authAPI } from "../services/api"
+import { registerUser } from "../features/auth/authService"
+import { selectAuthLoading, selectAuthError, clearError } from "../features/auth/authSlice"
 import toast, { Toaster } from 'react-hot-toast'
 
 const Register = () => {
   const navigate = useNavigate()
+  const dispatch = useDispatch()
+  const loading = useSelector(selectAuthLoading)
+  const authError = useSelector(selectAuthError)
+  
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [passwordsMatch, setPasswordsMatch] = useState(false)
   const [formData, setFormData] = useState({
@@ -76,8 +81,9 @@ const Register = () => {
     
     if (!validateForm()) return
 
-    setLoading(true)
+    // Clear any previous errors
     setError("")
+    dispatch(clearError())
 
     try {
       // Prepare data for backend (only required fields)
@@ -87,14 +93,8 @@ const Register = () => {
         password: formData.password,
       }
 
-      // Call registration API
-      const response = await authAPI.register(registrationData)
-
-      // Store token and user data
-      if (response.token) {
-        localStorage.setItem('token', response.token)
-        localStorage.setItem('user', JSON.stringify(response.user))
-      }
+      // Call registration API using Redux
+      await dispatch(registerUser(registrationData)).unwrap()
 
       // Show success toast
       toast.success('Account created successfully! Welcome to DevConnect Pro!', {
@@ -111,10 +111,10 @@ const Register = () => {
       console.error('Registration error:', error)
       
       // Handle specific error cases with toasts
-      if (error.message && error.message.toLowerCase().includes('email')) {
-        if (error.message.toLowerCase().includes('already exists') || 
-            error.message.toLowerCase().includes('already taken') ||
-            error.message.toLowerCase().includes('duplicate')) {
+      if (error && error.toLowerCase().includes('email')) {
+        if (error.toLowerCase().includes('already exists') || 
+            error.toLowerCase().includes('already taken') ||
+            error.toLowerCase().includes('duplicate')) {
           toast.error('This email address is already registered. Please use a different email or try logging in.', {
             duration: 5000,
             position: 'top-center',
@@ -125,10 +125,10 @@ const Register = () => {
             position: 'top-center',
           })
         }
-      } else if (error.message && error.message.toLowerCase().includes('username')) {
-        if (error.message.toLowerCase().includes('already exists') || 
-            error.message.toLowerCase().includes('already taken') ||
-            error.message.toLowerCase().includes('duplicate')) {
+      } else if (error && error.toLowerCase().includes('username')) {
+        if (error.toLowerCase().includes('already exists') || 
+            error.toLowerCase().includes('already taken') ||
+            error.toLowerCase().includes('duplicate')) {
           toast.error('This username is already taken. Please choose a different username.', {
             duration: 5000,
             position: 'top-center',
@@ -139,7 +139,7 @@ const Register = () => {
             position: 'top-center',
           })
         }
-      } else if (error.message && error.message.toLowerCase().includes('duplicate')) {
+      } else if (error && error.toLowerCase().includes('duplicate')) {
         // Generic duplicate error
         toast.error('An account with this information already exists. Please check your email and username.', {
           duration: 5000,
@@ -147,14 +147,12 @@ const Register = () => {
         })
       } else {
         // Generic error
-        toast.error(error.message || "Registration failed. Please try again.", {
+        toast.error(error || "Registration failed. Please try again.", {
           duration: 4000,
           position: 'top-center',
         })
-        setError(error.message || "Registration failed. Please try again.")
+        setError(error || "Registration failed. Please try again.")
       }
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -194,10 +192,10 @@ const Register = () => {
 
             <div className="space-y-6">
               {/* Error Alert */}
-              {error && (
+              {(error || authError) && (
                 <div className="alert alert-error">
                   <AlertCircle className="h-4 w-4" />
-                  <span className="text-sm">{error}</span>
+                  <span className="text-sm">{error || authError}</span>
                 </div>
               )}
 

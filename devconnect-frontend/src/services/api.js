@@ -10,6 +10,13 @@ const api = axios.create({
   },
 })
 
+// Store reference for Redux store (will be set by authService)
+let store = null
+
+export const setStore = (reduxStore) => {
+  store = reduxStore
+}
+
 // Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
@@ -27,11 +34,26 @@ api.interceptors.request.use(
 // Response interceptor to handle errors
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      window.location.href = '/login'
+      // If we have Redux store, dispatch logout action
+      if (store) {
+        try {
+          const { logoutUser } = await import('../features/auth/authService')
+          store.dispatch(logoutUser())
+        } catch (importError) {
+          console.error('Error importing auth service:', importError)
+          // Fallback to manual cleanup
+          localStorage.removeItem('token')
+          localStorage.removeItem('user')
+          window.location.href = '/login'
+        }
+      } else {
+        // Fallback to manual cleanup
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(error)
   }

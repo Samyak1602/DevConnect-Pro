@@ -1,11 +1,24 @@
-import React from 'react'
+import React, { useEffect } from 'react'
+import { useDispatch, useStore } from 'react-redux'
 import Landing from './pages/Landing'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Home from './pages/Home'
 import { Route, Routes } from 'react-router-dom'
+import { initializeAuth, initializeApiStore } from './features/auth/authService'
 
 const App = () => {
+  const dispatch = useDispatch()
+  const store = useStore()
+
+  useEffect(() => {
+    // Initialize auth state from localStorage on app start
+    dispatch(initializeAuth())
+    
+    // Set store reference for API interceptors
+    initializeApiStore(store)
+  }, [dispatch, store])
+
   return (
     <div>
       <Routes>

@@ -1,9 +1,19 @@
 import React, { useState } from "react"
-import { Link } from "react-router-dom"
-import { Code2, Github, Mail, Eye, EyeOff, ArrowLeft, LogIn, User } from "lucide-react"
+import { Link, useNavigate } from "react-router-dom"
+import { useDispatch, useSelector } from "react-redux"
+import { Code2, Github, Mail, Eye, EyeOff, ArrowLeft, LogIn, User, AlertCircle } from "lucide-react"
+import { loginUser } from "../features/auth/authService"
+import { selectAuthLoading, selectAuthError, clearError } from "../features/auth/authSlice"
+import toast, { Toaster } from 'react-hot-toast'
 
 const Login = () => {
+  const navigate = useNavigate()
+  const dispatch = useDispatch()
+  const loading = useSelector(selectAuthLoading)
+  const authError = useSelector(selectAuthError)
+  
   const [showPassword, setShowPassword] = useState(false)
+  const [error, setError] = useState("")
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -12,16 +22,53 @@ const Login = () => {
 
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
+    // Clear errors when user starts typing
+    if (error) setError("")
+    if (authError) dispatch(clearError())
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    // Handle login logic here
-    console.log("Login attempt:", formData)
+    
+    // Basic validation
+    if (!formData.email || !formData.password) {
+      setError("Please provide both email and password")
+      return
+    }
+
+    // Clear any previous errors
+    setError("")
+    dispatch(clearError())
+
+    try {
+      await dispatch(loginUser({
+        email: formData.email.trim().toLowerCase(),
+        password: formData.password,
+      })).unwrap()
+
+      // Show success toast
+      toast.success('Login successful! Welcome back!', {
+        duration: 2000,
+        position: 'top-center',
+      })
+
+      // Navigate to home page
+      navigate('/home', { replace: true })
+      
+    } catch (error) {
+      console.error('Login error:', error)
+      toast.error(error || "Login failed. Please try again.", {
+        duration: 4000,
+        position: 'top-center',
+      })
+      setError(error || "Login failed. Please try again.")
+    }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50 flex items-center justify-center p-4">
+    <>
+      <Toaster />
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Back to Home Link */}
         <div className="mb-8">
@@ -71,6 +118,14 @@ const Login = () => {
 
               <div className="divider text-xs uppercase text-slate-500">Or sign in with email</div>
 
+              {/* Error Alert */}
+              {(error || authError) && (
+                <div className="alert alert-error">
+                  <AlertCircle className="h-4 w-4" />
+                  <span className="text-sm">{error || authError}</span>
+                </div>
+              )}
+
               {/* Login Form */}
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Email */}
@@ -85,8 +140,9 @@ const Login = () => {
                       placeholder="john.doe@example.com"
                       value={formData.email}
                       onChange={(e) => handleInputChange("email", e.target.value)}
-                      className="input input-bordered border-slate-300 focus:border-indigo-500 bg-white w-full pl-10"
+                      className="input input-bordered border-slate-300 focus:border-indigo-500 bg-white w-full text-slate-900 placeholder-slate-400 disabled:bg-white disabled:text-slate-900 disabled:border-slate-300 disabled:opacity-70"
                       required
+                      disabled={loading}
                     />
                   </div>
                 </div>
@@ -102,13 +158,15 @@ const Login = () => {
                       placeholder="Enter your password"
                       value={formData.password}
                       onChange={(e) => handleInputChange("password", e.target.value)}
-                      className="input input-bordered border-slate-300 focus:border-indigo-500 pr-10 w-full bg-white"
+                      className="input input-bordered border-slate-300 focus:border-indigo-500 pr-10 w-full bg-white text-slate-900 placeholder-slate-400 disabled:bg-white disabled:text-slate-900 disabled:border-slate-300 disabled:opacity-70"
                       required
+                      disabled={loading}
                     />
                     <button
                       type="button"
                       className="btn btn-ghost btn-sm absolute right-0 top-0 h-full px-3"
                       onClick={() => setShowPassword(!showPassword)}
+                      disabled={loading}
                     >
                       {showPassword ? (
                         <EyeOff className="h-4 w-4 text-slate-400" />
@@ -139,10 +197,24 @@ const Login = () => {
 
                 <button
                   type="submit"
-                  className="btn btn-lg w-full bg-indigo-600 hover:bg-indigo-700 text-white border-none"
+                  className={`btn btn-lg w-full border-none ${
+                    !loading 
+                      ? 'bg-indigo-600 hover:bg-indigo-700 text-white' 
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  }`}
+                  disabled={loading}
                 >
-                  <LogIn className="h-4 w-4 mr-2" />
-                  Sign In
+                  {loading ? (
+                    <>
+                      <span className="loading loading-spinner loading-sm"></span>
+                      Signing In...
+                    </>
+                  ) : (
+                    <>
+                      <LogIn className="h-4 w-4 mr-2" />
+                      Sign In
+                    </>
+                  )}
                 </button>
               </form>
 
@@ -163,7 +235,8 @@ const Login = () => {
           <p>Secure login to DevConnect Pro</p>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   )
 }
 
