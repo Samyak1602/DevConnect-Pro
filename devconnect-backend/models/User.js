@@ -1,10 +1,21 @@
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
+    firstName:{
+        type: String,
+        required: [true,'Please add a first name'],
+        trim: true,
+    },
+    lastName:{
+        type: String,
+        required: [true,'Please add a last name'],
+        trim: true,
+    },
     username:{
         type: String,
-        required: [true,'Please add a username'],
+        required: [true,'Username is required'],
         unique: true,
+        trim: true,
     },
     email:{
         type: String,
@@ -51,6 +62,44 @@ const userSchema = new mongoose.Schema({
             type: String,
             trim: true
         }
+    },
+    followers: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }],
+    following: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }],
+    profileViews: {
+        type: Number,
+        default: 0
+    },
+    title: {
+        type: String,
+        trim: true,
+        maxLength: [100, 'Title cannot exceed 100 characters']
+    },
+    company: {
+        type: String,
+        trim: true,
+        maxLength: [100, 'Company cannot exceed 100 characters']
+    },
+    website: {
+        type: String,
+        trim: true
+    },
+    github: {
+        type: String,
+        trim: true
+    },
+    linkedin: {
+        type: String,
+        trim: true
+    },
+    twitter: {
+        type: String,
+        trim: true
     }
 },{timestamps: true});
 

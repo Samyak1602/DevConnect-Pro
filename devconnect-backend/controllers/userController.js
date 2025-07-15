@@ -22,8 +22,8 @@ exports.getMe = async (req, res, next) => {
 
 exports.updateMe = async (req, res, next) => {
     try {
-        // Fields that are allowed to be updated
-        const allowedFields = ['username', 'email', 'bio', 'avatar', 'skills', 'location'];
+        // Fields that are allowed to be updated (username is auto-generated and not updateable)
+        const allowedFields = ['firstName', 'lastName', 'email', 'bio', 'avatar', 'skills', 'location', 'title', 'company', 'website', 'github', 'linkedin', 'twitter'];
         
         // Create an object with only allowed fields
         const updateData = {};
@@ -46,17 +46,6 @@ exports.updateMe = async (req, res, next) => {
             });
             if (emailExists) {
                 return next(new ErrorResponse('Email already in use', 400));
-            }
-        }
-
-        // Check if username is being updated and already exists
-        if (updateData.username) {
-            const usernameExists = await User.findOne({ 
-                username: updateData.username, 
-                _id: { $ne: req.user.id } // Exclude current user
-            });
-            if (usernameExists) {
-                return next(new ErrorResponse('Username already in use', 400));
             }
         }
 
@@ -92,6 +81,181 @@ exports.updateMe = async (req, res, next) => {
             return next(new ErrorResponse(message, 400));
         }
         
+        next(err);
+    }
+};
+
+// Get user profile by username
+exports.getUserByUsername = async (req, res, next) => {
+    try {
+        const { username } = req.params;
+        
+        const user = await User.findOne({ username }).select('-password -email');
+        
+        if (!user) {
+            return next(new ErrorResponse('User not found', 404));
+        }
+
+        // Check if current user is following this user (if authenticated)
+        let isFollowedByCurrentUser = false;
+        if (req.user && req.user.id) {
+            const currentUser = await User.findById(req.user.id);
+            isFollowedByCurrentUser = currentUser.following && currentUser.following.includes(user._id);
+        }
+
+        res.status(200).json({
+            success: true,
+            user: {
+                ...user.toObject(),
+                isFollowedByCurrentUser
+            }
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// Get user projects by username  
+exports.getUserProjects = async (req, res, next) => {
+    try {
+        const { username } = req.params;
+        
+        const user = await User.findOne({ username });
+        if (!user) {
+            return next(new ErrorResponse('User not found', 404));
+        }
+
+        // Only show projects if viewing own profile
+        if (req.user.id !== user._id.toString()) {
+            return res.status(200).json({
+                success: true,
+                projects: []
+            });
+        }
+
+        // Get projects for this user
+        const Project = require('../models/Project');
+        const projects = await Project.find({ createdBy: user._id });
+
+        res.status(200).json({
+            success: true,
+            projects
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// Get user stats
+exports.getUserStats = async (req, res, next) => {
+    try {
+        const { username } = req.params;
+        
+        const user = await User.findOne({ username });
+        if (!user) {
+            return next(new ErrorResponse('User not found', 404));
+        }
+
+        const Project = require('../models/Project');
+        const projectCount = await Project.countDocuments({ createdBy: user._id });
+
+        const stats = {
+            followers: user.followers ? user.followers.length : 0,
+            following: user.following ? user.following.length : 0,
+            projects: projectCount,
+            contributions: 0, // This would need to be calculated based on actual data
+            endorsements: 0, // This would need to be implemented
+            profileViews: user.profileViews || 0
+        };
+
+        res.status(200).json({
+            success: true,
+            stats
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// Follow user
+exports.followUser = async (req, res, next) => {
+    try {
+        const { username } = req.params;
+        const currentUserId = req.user.id;
+        
+        // Find target user
+        const targetUser = await User.findOne({ username });
+        if (!targetUser) {
+            return next(new ErrorResponse('User not found', 404));
+        }
+
+        // Can't follow yourself
+        if (targetUser._id.toString() === currentUserId) {
+            return next(new ErrorResponse('Cannot follow yourself', 400));
+        }
+
+        // Get current user
+        const currentUser = await User.findById(currentUserId);
+        
+        // Check if already following
+        if (currentUser.following && currentUser.following.includes(targetUser._id)) {
+            return next(new ErrorResponse('Already following this user', 400));
+        }
+
+        // Add to following list
+        if (!currentUser.following) currentUser.following = [];
+        currentUser.following.push(targetUser._id);
+        await currentUser.save();
+
+        // Add to followers list
+        if (!targetUser.followers) targetUser.followers = [];
+        targetUser.followers.push(currentUserId);
+        await targetUser.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'User followed successfully'
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// Unfollow user
+exports.unfollowUser = async (req, res, next) => {
+    try {
+        const { username } = req.params;
+        const currentUserId = req.user.id;
+        
+        // Find target user
+        const targetUser = await User.findOne({ username });
+        if (!targetUser) {
+            return next(new ErrorResponse('User not found', 404));
+        }
+
+        // Get current user
+        const currentUser = await User.findById(currentUserId);
+        
+        // Check if following
+        if (!currentUser.following || !currentUser.following.includes(targetUser._id)) {
+            return next(new ErrorResponse('Not following this user', 400));
+        }
+
+        // Remove from following list
+        currentUser.following = currentUser.following.filter(id => id.toString() !== targetUser._id.toString());
+        await currentUser.save();
+
+        // Remove from followers list
+        if (targetUser.followers) {
+            targetUser.followers = targetUser.followers.filter(id => id.toString() !== currentUserId);
+            await targetUser.save();
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'User unfollowed successfully'
+        });
+    } catch (err) {
         next(err);
     }
 };

@@ -118,4 +118,100 @@ export const authAPI = {
   }
 }
 
+// Profile API
+export const profileAPI = {
+  getUserProfile: async (username) => {
+    try {
+      const response = await api.get(`/users/${username}`)
+      return response.data
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to fetch user profile' }
+    }
+  },
+
+  updateProfile: async (profileData) => {
+    try {
+      const response = await api.put('/users/profile', profileData)
+      return response.data
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to update profile' }
+    }
+  },
+
+  getUserProjects: async (username) => {
+    try {
+      const response = await api.get(`/users/${username}/projects`)
+      return response.data
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to fetch user projects' }
+    }
+  },
+
+  followUser: async (username) => {
+    try {
+      const response = await api.post(`/users/${username}/follow`)
+      return response.data
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to follow user' }
+    }
+  },
+
+  unfollowUser: async (username) => {
+    try {
+      const response = await api.delete(`/users/${username}/follow`)
+      return response.data
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to unfollow user' }
+    }
+  },
+
+  getUserStats: async (username) => {
+    try {
+      const response = await api.get(`/users/${username}/stats`)
+      return response.data
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to fetch user stats' }
+    }
+  }
+}
+
+// Projects API for profile-related functionality
+export const projectsAPI = {
+  createProject: async (projectData) => {
+    try {
+      const response = await api.post('/projects', projectData)
+      return response.data
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to create project' }
+    }
+  },
+
+  updateProject: async (projectId, projectData) => {
+    try {
+      const response = await api.put(`/projects/${projectId}`, projectData)
+      return response.data
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to update project' }
+    }
+  },
+
+  deleteProject: async (projectId) => {
+    try {
+      const response = await api.delete(`/projects/${projectId}`)
+      return response.data
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to delete project' }
+    }
+  },
+
+  getProjectById: async (projectId) => {
+    try {
+      const response = await api.get(`/projects/${projectId}`)
+      return response.data
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to fetch project' }
+    }
+  }
+}
+
 export default api

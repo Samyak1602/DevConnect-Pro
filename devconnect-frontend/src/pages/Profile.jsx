@@ -26,9 +26,11 @@ import {
   Settings,
   User,
   LogOut,
+  Plus,
 } from "lucide-react"
-import { selectUser, selectAuthLoading } from "../features/auth/authSlice"
+import { selectUser } from "../features/auth/authSlice"
 import { logoutUser } from "../features/auth/authService"
+import { profileAPI } from "../services/api"
 import toast, { Toaster } from 'react-hot-toast'
 
 const Profile = () => {
@@ -36,12 +38,15 @@ const Profile = () => {
   const navigate = useNavigate()
   const dispatch = useDispatch()
   const currentUser = useSelector(selectUser)
-  const loading = useSelector(selectAuthLoading)
   
   const [isFollowing, setIsFollowing] = useState(false)
   const [activeTab, setActiveTab] = useState("overview")
   const [profileUser, setProfileUser] = useState(null)
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [userProjects, setUserProjects] = useState([])
+  const [userStats, setUserStats] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   // Check if viewing own profile
   const isOwnProfile = currentUser?.username === username
@@ -57,47 +62,76 @@ const Profile = () => {
     }
   }
 
-  // Mock function to fetch user profile data
-  // In real app, this would be an API call
-  useEffect(() => {
-    const fetchUserProfile = async () => {
-      // Simulate API call
-      const mockUserData = {
-        id: username,
-        firstName: username === currentUser?.username ? currentUser.username : "John",
-        lastName: username === currentUser?.username ? "" : "Doe", 
-        username: username,
-        title: "Senior Full-Stack Developer",
-        company: "TechCorp Inc.",
-        location: "San Francisco, CA",
-        joinDate: "March 2023",
-        avatar: currentUser?.avatar || "/placeholder.svg",
-        coverImage: "/placeholder.svg?height=200&width=800",
-        bio: "Passionate full-stack developer with 5+ years of experience building scalable web applications. I love working with React, Node.js, and cloud technologies.",
-        email: `${username}@example.com`,
-        website: `https://${username}.dev`,
-        github: username,
-        linkedin: username,
-        twitter: username,
+  // Handle follow/unfollow user
+  const handleFollowToggle = async () => {
+    if (!currentUser) {
+      toast.error('Please login to follow users')
+      navigate('/login')
+      return
+    }
+
+    try {
+      if (isFollowing) {
+        await profileAPI.unfollowUser(username)
+        setIsFollowing(false)
+        toast.success('User unfollowed successfully')
+      } else {
+        await profileAPI.followUser(username)
+        setIsFollowing(true)
+        toast.success('User followed successfully')
       }
-      setProfileUser(mockUserData)
+      
+      // Refresh user stats to update follower count
+      const statsData = await profileAPI.getUserStats(username)
+      setUserStats(statsData.stats)
+      
+    } catch (err) {
+      console.error('Follow/unfollow error:', err)
+      toast.error(err.message || 'Failed to update follow status')
     }
-
-    if (username) {
-      fetchUserProfile()
-    }
-  }, [username, currentUser])
-
-  // Mock data that would normally come from API
-  const stats = {
-    followers: 1247,
-    following: 892,
-    projects: 24,
-    contributions: 1456,
-    endorsements: 89,
-    profileViews: 3421,
   }
 
+  // Fetch user profile, projects, and stats from backend
+  useEffect(() => {
+    const fetchUserData = async () => {
+      if (!username) return
+      
+      setIsLoading(true)
+      setError(null)
+      
+      try {
+        // Fetch user profile
+        const profileData = await profileAPI.getUserProfile(username)
+        setProfileUser(profileData.user)
+        
+        // Fetch user projects (only show on user's own profile)
+        if (isOwnProfile) {
+          const projectsData = await profileAPI.getUserProjects(username)
+          setUserProjects(projectsData.projects || [])
+        }
+        
+        // Fetch user stats
+        const statsData = await profileAPI.getUserStats(username)
+        setUserStats(statsData.stats)
+        
+        // Check if current user is following this user
+        if (!isOwnProfile && profileData.user) {
+          setIsFollowing(profileData.user.isFollowedByCurrentUser || false)
+        }
+        
+      } catch (err) {
+        console.error('Error fetching user data:', err)
+        setError(err.message || 'Failed to load user profile')
+        toast.error('Failed to load user profile')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchUserData()
+  }, [username, currentUser, isOwnProfile])
+
+  // Skills data (this could also come from backend in future)
   const skills = [
     { name: "JavaScript", level: 95, endorsements: 23 },
     { name: "React", level: 92, endorsements: 19 },
@@ -107,6 +141,19 @@ const Profile = () => {
     { name: "AWS", level: 75, endorsements: 10 },
   ]
 
+  // Use default stats if userStats is not available
+  const stats = userStats || {
+    followers: 0,
+    following: 0,
+    projects: userProjects.length,
+    contributions: 0,
+    endorsements: 0,
+    profileViews: 0,
+  }
+
+  // Projects now come from API via userProjects state
+  // Only show projects on user's own profile
+  /*
   const projects = [
     {
       id: 1,
@@ -133,6 +180,7 @@ const Profile = () => {
       featured: true,
     },
   ]
+  */
 
   const experience = [
     {
@@ -179,16 +227,32 @@ const Profile = () => {
     twitter: "",
   }
 
-  if (loading) {
+  // Show loading state
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="loading loading-spinner loading-lg"></div>
+      </div>
+    )
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <span className="loading loading-spinner loading-lg text-indigo-600"></span>
-          <p className="mt-4 text-slate-700">Loading profile...</p>
+          <h2 className="text-2xl font-bold text-error mb-4">Profile Not Found</h2>
+          <p className="text-slate-600 mb-4">{error}</p>
+          <button className="btn btn-primary" onClick={() => navigate('/')}>
+            Go Home
+          </button>
         </div>
       </div>
     )
   }
+
+  // Check if profile needs updates (for showing prompts)
+  const isProfileIncomplete = !profileUser?.bio || !profileUser?.title || !profileUser?.company
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -242,7 +306,7 @@ const Profile = () => {
               </div>
               <ul tabIndex={0} className="menu menu-sm dropdown-content bg-white rounded-box z-[1] mt-3 w-52 p-2 shadow border border-slate-200">
                 <li>
-                  <Link to="/profile" className="justify-between text-slate-700 hover:text-indigo-600">
+                  <Link to={`/profile/${currentUser?.username}`} className="justify-between text-slate-700 hover:text-indigo-600">
                     <span className="flex items-center gap-2">
                       <User className="h-4 w-4" />
                       My Profile
@@ -268,6 +332,46 @@ const Profile = () => {
       </div>
 
       <div className="container mx-auto px-4 py-8">
+        {/* Profile Completion Banner - Only show on own profile if incomplete */}
+        {isOwnProfile && isProfileIncomplete && (
+          <div className="card bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 mb-6">
+            <div className="card-body p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center">
+                    <User className="h-6 w-6 text-indigo-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-slate-900">Complete your profile</h3>
+                    <p className="text-sm text-slate-600">
+                      Add more details to help others discover and connect with you
+                    </p>
+                  </div>
+                </div>
+                <button className="btn bg-indigo-600 hover:bg-indigo-700 text-white btn-sm">
+                  <Edit className="h-4 w-4 mr-2" />
+                  Update Profile
+                </button>
+              </div>
+              {/* Progress indicators */}
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                <div className={`flex items-center gap-2 ${profileUser?.bio ? 'text-green-600' : 'text-slate-500'}`}>
+                  <div className={`w-2 h-2 rounded-full ${profileUser?.bio ? 'bg-green-500' : 'bg-slate-300'}`}></div>
+                  Add bio {profileUser?.bio && '✓'}
+                </div>
+                <div className={`flex items-center gap-2 ${profileUser?.title ? 'text-green-600' : 'text-slate-500'}`}>
+                  <div className={`w-2 h-2 rounded-full ${profileUser?.title ? 'bg-green-500' : 'bg-slate-300'}`}></div>
+                  Add job title {profileUser?.title && '✓'}
+                </div>
+                <div className={`flex items-center gap-2 ${profileUser?.company ? 'text-green-600' : 'text-slate-500'}`}>
+                  <div className={`w-2 h-2 rounded-full ${profileUser?.company ? 'bg-green-500' : 'bg-slate-300'}`}></div>
+                  Add company {profileUser?.company && '✓'}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Profile Header */}
         <div className="card bg-white shadow-sm border border-slate-200 mb-8 overflow-hidden">
           {/* Cover Image */}
@@ -294,19 +398,39 @@ const Profile = () => {
                     <h1 className="text-3xl font-bold text-slate-900">
                       {user.firstName} {user.lastName}
                     </h1>
-                    <p className="text-xl text-slate-600 mt-1">{user.title}</p>
+                    {user.title ? (
+                      <p className="text-xl text-slate-600 mt-1">{user.title}</p>
+                    ) : isOwnProfile ? (
+                      <p className="text-xl text-slate-400 mt-1 italic">Add your job title</p>
+                    ) : (
+                      <p className="text-xl text-slate-400 mt-1 italic">No title added</p>
+                    )}
                     <div className="flex items-center gap-4 mt-2 text-sm text-slate-500">
-                      <div className="flex items-center gap-1">
-                        <Briefcase className="h-4 w-4" />
-                        {user.company}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <MapPin className="h-4 w-4" />
-                        {user.location}
-                      </div>
+                      {user.company ? (
+                        <div className="flex items-center gap-1">
+                          <Briefcase className="h-4 w-4" />
+                          {user.company}
+                        </div>
+                      ) : isOwnProfile ? (
+                        <div className="flex items-center gap-1 text-slate-400">
+                          <Briefcase className="h-4 w-4" />
+                          <span className="italic">Add company</span>
+                        </div>
+                      ) : null}
+                      {user.location ? (
+                        <div className="flex items-center gap-1">
+                          <MapPin className="h-4 w-4" />
+                          {user.location}
+                        </div>
+                      ) : isOwnProfile ? (
+                        <div className="flex items-center gap-1 text-slate-400">
+                          <MapPin className="h-4 w-4" />
+                          <span className="italic">Add location</span>
+                        </div>
+                      ) : null}
                       <div className="flex items-center gap-1">
                         <Calendar className="h-4 w-4" />
-                        Joined {user.joinDate}
+                        Joined {user.joinDate || 'recently'}
                       </div>
                     </div>
                   </div>
@@ -321,7 +445,7 @@ const Profile = () => {
                       <>
                         <button
                           className={`btn ${isFollowing ? 'btn-outline border-slate-300' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}
-                          onClick={() => setIsFollowing(!isFollowing)}
+                          onClick={handleFollowToggle}
                         >
                           {isFollowing ? "Following" : "Follow"}
                         </button>
@@ -335,7 +459,18 @@ const Profile = () => {
                 </div>
 
                 {/* Bio */}
-                <p className="text-slate-700 mt-4 leading-relaxed">{user.bio}</p>
+                {user.bio ? (
+                  <p className="text-slate-700 mt-4 leading-relaxed">{user.bio}</p>
+                ) : isOwnProfile ? (
+                  <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                    <p className="text-slate-400 italic text-sm mb-2">Tell others about yourself</p>
+                    <button className="text-indigo-600 text-sm hover:text-indigo-700 font-medium">
+                      Add bio
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-slate-400 mt-4 italic text-sm">No bio added yet</p>
+                )}
 
                 {/* Social Links */}
                 <div className="flex items-center gap-4 mt-4">
@@ -374,6 +509,14 @@ const Profile = () => {
                       <Twitter className="h-4 w-4 mr-1" />
                       Twitter
                     </Link>
+                  )}
+                  
+                  {/* Show prompt to add social links if none exist and it's own profile */}
+                  {isOwnProfile && !user.website && !user.github && !user.linkedin && !user.twitter && (
+                    <button className="flex items-center text-slate-400 hover:text-indigo-600 transition-colors text-sm">
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add social links
+                    </button>
                   )}
                 </div>
               </div>
@@ -530,11 +673,12 @@ const Profile = () => {
                         <Star className="h-5 w-5 mr-2 text-indigo-600" />
                         Featured Projects
                       </h2>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {projects
-                          .filter((p) => p.featured)
-                          .map((project) => (
-                            <div key={project.id} className="card bg-white border border-slate-200">
+                      {isOwnProfile ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {userProjects
+                            .filter((p) => p.featured)
+                            .map((project) => (
+                              <div key={project.id} className="card bg-white border border-slate-200">
                               <div className="aspect-video bg-slate-100 rounded-t-lg overflow-hidden">
                                 <img
                                   src={project.image || "/placeholder.svg"}
@@ -575,7 +719,12 @@ const Profile = () => {
                               </div>
                             </div>
                           ))}
-                      </div>
+                        </div>
+                      ) : (
+                        <div className="text-center py-8">
+                          <p className="text-slate-600">Projects are only visible on user's own profile</p>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -611,7 +760,9 @@ const Profile = () => {
 
               {activeTab === 'projects' && (
                 <div className="space-y-6">
-                  {projects.map((project) => (
+                  {isOwnProfile ? (
+                    userProjects.length > 0 ? (
+                      userProjects.map((project) => (
                     <div key={project.id} className="card bg-white shadow-sm border border-slate-200">
                       <div className="card-body p-6">
                         <div className="flex flex-col md:flex-row md:gap-6">
@@ -665,7 +816,19 @@ const Profile = () => {
                         </div>
                       </div>
                     </div>
-                  ))}
+                      ))
+                    ) : (
+                      <div className="text-center py-12">
+                        <h3 className="text-lg font-semibold text-slate-900 mb-2">No Projects Found</h3>
+                        <p className="text-slate-600">No projects have been created yet.</p>
+                      </div>
+                    )
+                  ) : (
+                    <div className="text-center py-12">
+                      <h3 className="text-lg font-semibold text-slate-900 mb-2">Projects Private</h3>
+                      <p className="text-slate-600">Projects are only visible on the user's own profile.</p>
+                    </div>
+                  )}
                 </div>
               )}
 

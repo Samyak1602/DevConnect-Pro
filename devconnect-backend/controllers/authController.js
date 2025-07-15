@@ -2,13 +2,36 @@ const User = require("../models/User");
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
+// Helper function to generate unique username
+const generateUniqueUsername = async (firstName) => {
+    const baseUsername = firstName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    let username = baseUsername;
+    let counter = 1;
+    
+    // Keep trying until we find a unique username
+    while (await User.findOne({ username })) {
+        // Generate random 3-4 digit number
+        const randomNum = Math.floor(Math.random() * 9000) + 1000;
+        username = `${baseUsername}${randomNum}`;
+        counter++;
+        
+        // Fallback: if we've tried too many times, add timestamp
+        if (counter > 10) {
+            username = `${baseUsername}${Date.now().toString().slice(-6)}`;
+            break;
+        }
+    }
+    
+    return username;
+};
+
 exports.register = async (req,res,next) => {
     try{
-        const {username,email,password} = req.body;
+        const {firstName, lastName, email, password} = req.body;
 
         // Input validation
-        if(!username || !email || !password) {
-            return res.status(400).json({message: 'Please provide username, email, and password'});
+        if(!firstName || !lastName || !email || !password) {
+            return res.status(400).json({message: 'Please provide first name, last name, email, and password'});
         }
 
         if(password.length < 6) {
@@ -21,15 +44,14 @@ exports.register = async (req,res,next) => {
             return res.status(400).json({message:'This email address is already registered. Please use a different email or try logging in.'});
         }
 
-        // Check for existing username
-        const existingUsername = await User.findOne({username});
-        if(existingUsername){
-            return res.status(400).json({message:'This username is already taken. Please choose a different username.'});
-        }
+        // Generate unique username
+        const username = await generateUniqueUsername(firstName);
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const user = await User.create({
+            firstName,
+            lastName,
             username,
             email,
             password: hashedPassword
@@ -47,6 +69,8 @@ exports.register = async (req,res,next) => {
             token,
             user: {
                 id: user._id,
+                firstName: user.firstName,
+                lastName: user.lastName,
                 username: user.username,
                 email: user.email,
                 role: user.role
@@ -99,6 +123,8 @@ exports.login = async(req,res,next) => {
             token,
             user: {
                 id: user._id,
+                firstName: user.firstName,
+                lastName: user.lastName,
                 username: user.username,
                 email: user.email,
                 role: user.role

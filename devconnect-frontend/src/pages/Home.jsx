@@ -39,15 +39,16 @@ const Home = () => {
       await dispatch(logoutUser()).unwrap()
       toast.success('Logged out successfully!')
       navigate('/login')
-    } catch (error) {
+    } catch (err) {
+      console.error('Logout error:', err)
       toast.error('Error logging out')
     }
   }
 
   const dashboardData = {
     user: {
-      name: user?.username || "John Doe",
-      avatar: user?.avatar || "/placeholder.svg",
+      name: user.user ? `${user.user.firstName} ${user.user.lastName}` : "John Doe",
+      avatar: user.user?.avatar || "/placeholder.svg",
       notifications: 5,
     },
   stats: {
@@ -220,12 +221,12 @@ const Home = () => {
                 onClick={() => setShowUserMenu(!showUserMenu)}
               >
                 <div className="w-8 rounded-full">
-                  <img alt={user?.username || "User"} src={user?.avatar || "/placeholder.svg"} />
+                  <img alt={user.user ? `${user.user.firstName} ${user.user.lastName}` : "User"} src={user.user?.avatar || "/placeholder.svg"} />
                 </div>
               </div>
               <ul tabIndex={0} className="menu menu-sm dropdown-content bg-white rounded-box z-[1] mt-3 w-52 p-2 shadow border border-slate-200">
                 <li>
-                  <Link to="/profile" className="justify-between text-slate-700 hover:text-indigo-600">
+                  <Link to={`/profile/${user.user?.username}`} className="justify-between text-slate-700 hover:text-indigo-600">
                     <span className="flex items-center gap-2">
                       <User className="h-4 w-4" />
                       Profile
@@ -333,7 +334,7 @@ const Home = () => {
                 <div className="flex items-center gap-3">
                   <div className="avatar">
                     <div className="w-10 rounded-full">
-                      <img src={user?.avatar || "/placeholder.svg"} alt={user?.username || "User"} />
+                      <img src={user.user?.avatar || "/placeholder.svg"} alt={user.user ? `${user.user.firstName} ${user.user.lastName}` : "User"} />
                     </div>
                   </div>
                   <button className="btn btn-outline flex-1 justify-start text-slate-500 border-slate-300 hover:border-indigo-300">

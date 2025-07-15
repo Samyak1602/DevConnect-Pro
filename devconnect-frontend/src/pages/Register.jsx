@@ -1,7 +1,7 @@
 import React, { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { useDispatch, useSelector } from "react-redux"
-import { Code2, Github, Mail, Eye, EyeOff, ArrowLeft, Check, User, AlertCircle } from "lucide-react"
+import { Code2, Github, Mail, Eye, EyeOff, ArrowLeft, Check, AlertCircle } from "lucide-react"
 import { registerUser } from "../features/auth/authService"
 import { selectAuthLoading, selectAuthError, clearError } from "../features/auth/authSlice"
 import toast, { Toaster } from 'react-hot-toast'
@@ -17,7 +17,8 @@ const Register = () => {
   const [error, setError] = useState("")
   const [passwordsMatch, setPasswordsMatch] = useState(false)
   const [formData, setFormData] = useState({
-    username: "",
+    firstName: "",
+    lastName: "",
     email: "",
     password: "",
     confirmPassword: "",
@@ -48,7 +49,7 @@ const Register = () => {
   }
 
   const validateForm = () => {
-    if (!formData.email || !formData.username || !formData.password) {
+    if (!formData.email || !formData.firstName || !formData.lastName || !formData.password) {
       setError("All fields are required")
       return false
     }
@@ -88,7 +89,8 @@ const Register = () => {
     try {
       // Prepare data for backend (only required fields)
       const registrationData = {
-        username: formData.username.trim(),
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
         email: formData.email.trim().toLowerCase(),
         password: formData.password,
       }
@@ -126,19 +128,11 @@ const Register = () => {
           })
         }
       } else if (error && error.toLowerCase().includes('username')) {
-        if (error.toLowerCase().includes('already exists') || 
-            error.toLowerCase().includes('already taken') ||
-            error.toLowerCase().includes('duplicate')) {
-          toast.error('This username is already taken. Please choose a different username.', {
-            duration: 5000,
-            position: 'top-center',
-          })
-        } else {
-          toast.error('Invalid username. Please choose a different username.', {
-            duration: 4000,
-            position: 'top-center',
-          })
-        }
+        // Username errors are now auto-generated, so this shouldn't happen
+        toast.error('System error generating username. Please try again.', {
+          duration: 4000,
+          position: 'top-center',
+        })
       } else if (error && error.toLowerCase().includes('duplicate')) {
         // Generic duplicate error
         toast.error('An account with this information already exists. Please check your email and username.', {
@@ -239,26 +233,36 @@ const Register = () => {
                   />
                 </div>
 
-                {/* Username */}
+                {/* First Name */}
                 <div className="form-control">
                   <label className="label">
-                    <span className="label-text text-sm font-medium text-slate-700">Username</span>
+                    <span className="label-text text-sm font-medium text-slate-700">First Name</span>
                   </label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder="johndoe"
-                      value={formData.username}
-                      onChange={(e) => handleInputChange("username", e.target.value)}
-                      className="input input-bordered border-slate-300 focus:border-indigo-500 w-full bg-white text-slate-900 placeholder-slate-400 disabled:bg-white disabled:text-slate-900 disabled:border-slate-300 disabled:opacity-70"
-                      required
-                      disabled={loading}
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    placeholder="John"
+                    value={formData.firstName}
+                    onChange={(e) => handleInputChange("firstName", e.target.value)}
+                    className="input input-bordered border-slate-300 focus:border-indigo-500 bg-white w-full text-slate-900 placeholder-slate-400 disabled:bg-white disabled:text-slate-900 disabled:border-slate-300 disabled:opacity-70"
+                    required
+                    disabled={loading}
+                  />
+                </div>
+
+                {/* Last Name */}
+                <div className="form-control">
                   <label className="label">
-                    <span className="label-text-alt text-slate-500">This will be your DevConnect Pro profile URL</span>
+                    <span className="label-text text-sm font-medium text-slate-700">Last Name</span>
                   </label>
+                  <input
+                    type="text"
+                    placeholder="Doe"
+                    value={formData.lastName}
+                    onChange={(e) => handleInputChange("lastName", e.target.value)}
+                    className="input input-bordered border-slate-300 focus:border-indigo-500 bg-white w-full text-slate-900 placeholder-slate-400 disabled:bg-white disabled:text-slate-900 disabled:border-slate-300 disabled:opacity-70"
+                    required
+                    disabled={loading}
+                  />
                 </div>
 
                 {/* Password */}
@@ -394,7 +398,8 @@ const Register = () => {
                   className={`btn btn-lg w-full border-none ${
                     formData.agreeToTerms && 
                     formData.email && 
-                    formData.username && 
+                    formData.firstName && 
+                    formData.lastName && 
                     formData.password.length >= 6 && 
                     (formData.confirmPassword.length === 0 || passwordsMatch) && 
                     !loading
@@ -404,7 +409,8 @@ const Register = () => {
                   disabled={
                     !formData.agreeToTerms || 
                     !formData.email || 
-                    !formData.username || 
+                    !formData.firstName || 
+                    !formData.lastName || 
                     formData.password.length < 6 || 
                     (formData.confirmPassword.length > 0 && !passwordsMatch) ||
                     loading
