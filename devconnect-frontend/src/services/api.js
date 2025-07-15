@@ -36,23 +36,20 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response?.status === 401) {
-      // If we have Redux store, dispatch logout action
-      if (store) {
+      // Only logout if we have a token and it's actually invalid
+      const token = localStorage.getItem('token')
+      if (token && store) {
         try {
           const { logoutUser } = await import('../features/auth/authService')
+          console.log('Token appears invalid, logging out...')
           store.dispatch(logoutUser())
         } catch (importError) {
           console.error('Error importing auth service:', importError)
           // Fallback to manual cleanup
           localStorage.removeItem('token')
           localStorage.removeItem('user')
-          window.location.href = '/login'
+          // Don't redirect immediately, let the ProtectedRoute handle it
         }
-      } else {
-        // Fallback to manual cleanup
-        localStorage.removeItem('token')
-        localStorage.removeItem('user')
-        window.location.href = '/login'
       }
     }
     return Promise.reject(error)

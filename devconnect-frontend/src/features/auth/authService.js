@@ -72,19 +72,32 @@ export const initializeAuth = () => (dispatch) => {
   const token = localStorage.getItem('token')
   const userString = localStorage.getItem('user')
   
+  console.log('Initializing auth state...', { hasToken: !!token, hasUser: !!userString })
+  
   if (token && userString) {
     try {
       const user = JSON.parse(userString)
-      dispatch({
-        type: 'auth/setUserFromStorage',
-        payload: { user, token }
-      })
+      
+      // Validate token format (basic check)
+      if (token.length > 10 && user && user.id) {
+        dispatch({
+          type: 'auth/setUserFromStorage',
+          payload: { user, token }
+        })
+        console.log('Auth state initialized successfully')
+      } else {
+        console.warn('Invalid token or user data found, clearing...')
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+      }
     } catch (error) {
       console.error('Error parsing user from localStorage:', error)
       // Clear corrupted data
       localStorage.removeItem('token')
       localStorage.removeItem('user')
     }
+  } else {
+    console.log('No auth data found in localStorage')
   }
 }
 

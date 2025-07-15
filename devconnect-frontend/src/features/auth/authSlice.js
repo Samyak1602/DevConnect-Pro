@@ -61,14 +61,20 @@ const authSlice = createSlice({
     setUserFromStorage: (state, action) => {
       const { user, token } = action.payload
       if (user && token) {
+        console.log('Setting user from storage:', { userId: user.id, username: user.username })
         state.user = user
         state.token = token
         state.isAuthenticated = true
+        state.loading = false
+        state.error = null
+      } else {
+        console.warn('Invalid user or token provided to setUserFromStorage')
       }
     },
     
     // Logout
     logout: (state) => {
+      console.log('Logging out user')
       state.user = null
       state.token = null
       state.isAuthenticated = false
