@@ -348,7 +348,10 @@ const Profile = () => {
                     </p>
                   </div>
                 </div>
-                <button className="btn bg-indigo-600 hover:bg-indigo-700 text-white btn-sm">
+                <button 
+                  onClick={() => navigate('/profile/edit')}
+                  className="btn bg-indigo-600 hover:bg-indigo-700 text-white btn-sm"
+                >
                   <Edit className="h-4 w-4 mr-2" />
                   Update Profile
                 </button>
@@ -420,7 +423,10 @@ const Profile = () => {
                       {user.location ? (
                         <div className="flex items-center gap-1">
                           <MapPin className="h-4 w-4" />
-                          {user.location}
+                          {typeof user.location === 'object' && user.location ? 
+                            `${user.location.city || ''} ${user.location.state || ''} ${user.location.country || ''}`.trim() || 'Location not specified' :
+                            user.location || 'Location not specified'
+                          }
                         </div>
                       ) : isOwnProfile ? (
                         <div className="flex items-center gap-1 text-slate-400">
@@ -437,7 +443,10 @@ const Profile = () => {
 
                   <div className="flex items-center gap-3 mt-4 sm:mt-0">
                     {isOwnProfile ? (
-                      <button className="btn bg-indigo-600 hover:bg-indigo-700 text-white">
+                      <button 
+                        onClick={() => navigate('/profile/edit')}
+                        className="btn bg-indigo-600 hover:bg-indigo-700 text-white"
+                      >
                         <Edit className="h-4 w-4 mr-2" />
                         Edit Profile
                       </button>
@@ -464,7 +473,10 @@ const Profile = () => {
                 ) : isOwnProfile ? (
                   <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-lg">
                     <p className="text-slate-400 italic text-sm mb-2">Tell others about yourself</p>
-                    <button className="text-indigo-600 text-sm hover:text-indigo-700 font-medium">
+                    <button 
+                      onClick={() => navigate('/profile/edit')}
+                      className="text-indigo-600 text-sm hover:text-indigo-700 font-medium"
+                    >
                       Add bio
                     </button>
                   </div>
@@ -513,7 +525,10 @@ const Profile = () => {
                   
                   {/* Show prompt to add social links if none exist and it's own profile */}
                   {isOwnProfile && !user.website && !user.github && !user.linkedin && !user.twitter && (
-                    <button className="flex items-center text-slate-400 hover:text-indigo-600 transition-colors text-sm">
+                    <button 
+                      onClick={() => navigate('/profile/edit')}
+                      className="flex items-center text-slate-400 hover:text-indigo-600 transition-colors text-sm"
+                    >
                       <Plus className="h-4 w-4 mr-1" />
                       Add social links
                     </button>
@@ -845,7 +860,12 @@ const Profile = () => {
                             <h3 className="text-xl font-semibold text-slate-900">{exp.title}</h3>
                             <p className="text-indigo-600 font-medium">{exp.company}</p>
                             <div className="flex items-center gap-4 mt-1 text-sm text-slate-500">
-                              <span>{exp.location}</span>
+                              <span>
+                                {typeof exp.location === 'object' && exp.location ? 
+                                  `${exp.location.city || ''} ${exp.location.state || ''} ${exp.location.country || ''}`.trim() || 'Location not specified' :
+                                  exp.location || 'Location not specified'
+                                }
+                              </span>
                               <span>•</span>
                               <span>
                                 {exp.startDate} - {exp.endDate}

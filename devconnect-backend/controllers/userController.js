@@ -33,10 +33,24 @@ exports.updateMe = async (req, res, next) => {
             }
         });
 
+        // Handle location field - convert string to object format if needed
+        if (updateData.location && typeof updateData.location === 'string') {
+            // If location is a string, convert it to the object format expected by the model
+            const locationParts = updateData.location.split(',').map(part => part.trim());
+            updateData.location = {
+                city: locationParts[0] || '',
+                state: locationParts[1] || '',
+                country: locationParts[2] || locationParts[1] || '' // If only 2 parts, assume city, country
+            };
+        }
+
         // If no valid fields to update
         if (Object.keys(updateData).length === 0) {
             return next(new ErrorResponse('No valid fields provided for update', 400));
         }
+
+        console.log('UpdateMe: Received data:', req.body);
+        console.log('UpdateMe: Filtered data:', updateData);
 
         // Check if email is being updated and already exists
         if (updateData.email) {
@@ -48,6 +62,10 @@ exports.updateMe = async (req, res, next) => {
                 return next(new ErrorResponse('Email already in use', 400));
             }
         }
+
+        console.log('UpdateMe: User ID from token:', req.user.id);
+        console.log('UpdateMe: Received data:', req.body);
+        console.log('UpdateMe: Filtered data:', updateData);
 
         // Update user
         const user = await User.findByIdAndUpdate(
@@ -62,6 +80,8 @@ exports.updateMe = async (req, res, next) => {
         if (!user) {
             return next(new ErrorResponse('User not found', 404));
         }
+
+        console.log('UpdateMe: Updated user:', user);
 
         res.status(200).json({
             success: true,
@@ -90,7 +110,21 @@ exports.getUserByUsername = async (req, res, next) => {
     try {
         const { username } = req.params;
         
-        const user = await User.findOne({ username }).select('-password -email');
+        // Determine what fields to select based on whether this is the user's own profile
+        let selectFields = '-password';
+        if (!req.user || !req.user.id) {
+            // If not authenticated, hide email
+            selectFields = '-password -email';
+        } else {
+            // Check if this is the user's own profile
+            const isOwnProfile = await User.findOne({ username, _id: req.user.id });
+            if (!isOwnProfile) {
+                // If viewing someone else's profile, hide email
+                selectFields = '-password -email';
+            }
+        }
+        
+        const user = await User.findOne({ username }).select(selectFields);
         
         if (!user) {
             return next(new ErrorResponse('User not found', 404));
@@ -105,7 +139,7 @@ exports.getUserByUsername = async (req, res, next) => {
 
         res.status(200).json({
             success: true,
-            user: {
+            data: {
                 ...user.toObject(),
                 isFollowedByCurrentUser
             }

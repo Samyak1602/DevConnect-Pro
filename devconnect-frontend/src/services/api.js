@@ -117,10 +117,25 @@ export const authAPI = {
 
 // Profile API
 export const profileAPI = {
+  getCurrentUserProfile: async () => {
+    try {
+      const response = await api.get('/users/me')
+      return {
+        success: response.data.success,
+        user: response.data.data
+      }
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to fetch current user profile' }
+    }
+  },
+
   getUserProfile: async (username) => {
     try {
       const response = await api.get(`/users/${username}`)
-      return response.data
+      return {
+        success: response.data.success,
+        user: response.data.data
+      }
     } catch (error) {
       throw error.response?.data || { message: 'Failed to fetch user profile' }
     }
@@ -128,8 +143,11 @@ export const profileAPI = {
 
   updateProfile: async (profileData) => {
     try {
-      const response = await api.put('/users/profile', profileData)
-      return response.data
+      const response = await api.put('/users/me', profileData)
+      return {
+        success: response.data.success,
+        user: response.data.data
+      }
     } catch (error) {
       throw error.response?.data || { message: 'Failed to update profile' }
     }

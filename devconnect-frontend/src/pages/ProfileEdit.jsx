@@ -15,91 +15,47 @@ import {
   Edit,
   Camera,
 } from "lucide-react"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { useState, useEffect } from "react"
-import { useSelector } from "react-redux"
-import { selectUser, selectIsAuthenticated } from "../features/auth/authSlice"
+import { useSelector, useDispatch } from "react-redux"
+import { selectUser, selectIsAuthenticated, updateUser } from "../features/auth/authSlice"
+import { profileAPI } from "../services/api"
+import toast from 'react-hot-toast'
 
-// Mock current user data
-const initialProfileData = {
+// Initial empty profile structure
+const getInitialProfileData = () => ({
   personalInfo: {
-    firstName: "John",
-    lastName: "Doe",
-    username: "johndoe",
-    email: "john.doe@example.com",
-    phone: "+1 (555) 123-4567",
-    location: "San Francisco, CA",
-    website: "https://johndoe.dev",
-    bio: "Passionate full-stack developer with 5+ years of experience building scalable web applications. I love working with React, Node.js, and cloud technologies. Always eager to learn new technologies and contribute to open source projects.",
-    avatar: "/placeholder.svg?height=120&width=120",
-    coverImage: "/placeholder.svg?height=200&width=800",
+    firstName: "",
+    lastName: "",
+    username: "",
+    email: "",
+    phone: "",
+    location: "",
+    website: "",
+    bio: "",
+    avatar: "",
+    coverImage: "",
   },
   professionalInfo: {
-    title: "Senior Full-Stack Developer",
-    company: "TechCorp Inc.",
-    experienceLevel: "Senior Developer (5+ years)",
-    primarySkill: "Full-stack Development",
-    hourlyRate: "$85",
+    title: "",
+    company: "",
+    experienceLevel: "Student / Learning to code",
+    primarySkill: "Frontend Development",
+    hourlyRate: "",
     availability: "Available for freelance",
     workType: "Remote",
   },
   socialLinks: {
-    github: "johndoe",
-    linkedin: "johndoe",
-    twitter: "johndoe",
-    portfolio: "https://johndoe.dev",
-    blog: "https://blog.johndoe.dev",
+    github: "",
+    linkedin: "",
+    twitter: "",
+    portfolio: "",
+    blog: "",
   },
-  skills: [
-    { name: "JavaScript", level: 95, category: "Frontend" },
-    { name: "React", level: 92, category: "Frontend" },
-    { name: "Node.js", level: 88, category: "Backend" },
-    { name: "TypeScript", level: 85, category: "Frontend" },
-    { name: "Python", level: 78, category: "Backend" },
-    { name: "AWS", level: 75, category: "DevOps" },
-    { name: "Docker", level: 72, category: "DevOps" },
-    { name: "GraphQL", level: 68, category: "Backend" },
-  ],
-  experience: [
-    {
-      id: 1,
-      title: "Senior Full-Stack Developer",
-      company: "TechCorp Inc.",
-      location: "San Francisco, CA",
-      startDate: "2022-01",
-      endDate: "",
-      current: true,
-      description:
-        "Lead development of microservices architecture, mentor junior developers, and collaborate with product teams to deliver high-quality features.",
-      technologies: ["React", "Node.js", "AWS", "Docker"],
-    },
-    {
-      id: 2,
-      title: "Full-Stack Developer",
-      company: "StartupXYZ",
-      location: "Remote",
-      startDate: "2020-06",
-      endDate: "2021-12",
-      current: false,
-      description:
-        "Built and maintained web applications, implemented CI/CD pipelines, and contributed to product strategy discussions.",
-      technologies: ["Vue.js", "Python", "PostgreSQL", "GCP"],
-    },
-  ],
-  education: [
-    {
-      id: 1,
-      degree: "Bachelor of Science in Computer Science",
-      school: "University of California, Berkeley",
-      location: "Berkeley, CA",
-      startDate: "2016-09",
-      endDate: "2020-05",
-      gpa: "3.8",
-      description:
-        "Focused on software engineering, algorithms, and data structures. Active member of the Computer Science Student Association.",
-    },
-  ],
-}
+  skills: [],
+  experience: [],
+  education: [],
+})
 
 const skillCategories = ["Frontend", "Backend", "Mobile", "DevOps", "Database", "Design", "Other"]
 const experienceLevels = [
@@ -123,31 +79,91 @@ const primarySkills = [
 ]
 
 export default function ProfileEdit() {
+  const navigate = useNavigate()
+  const dispatch = useDispatch()
   const currentUser = useSelector(selectUser)
   const isAuthenticated = useSelector(selectIsAuthenticated)
-  const [profileData, setProfileData] = useState(initialProfileData)
+  const [profileData, setProfileData] = useState(getInitialProfileData())
   const [activeTab, setActiveTab] = useState("personal")
   const [newSkill, setNewSkill] = useState({ name: "", level: 50, category: "Frontend" })
   const [isPreviewMode, setIsPreviewMode] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
 
-  // Initialize form with current user data if available
+  // Fetch user profile data on component mount
   useEffect(() => {
-    if (currentUser && isAuthenticated) {
-      console.log('ProfileEdit: Initializing with user data:', currentUser.username)
-      // You can merge currentUser data with initialProfileData here
-      // For now, keeping the mock data but you could do:
-      // setProfileData(prev => ({
-      //   ...prev,
-      //   personalInfo: {
-      //     ...prev.personalInfo,
-      //     firstName: currentUser.firstName || prev.personalInfo.firstName,
-      //     lastName: currentUser.lastName || prev.personalInfo.lastName,
-      //     email: currentUser.email || prev.personalInfo.email,
-      //     username: currentUser.username || prev.personalInfo.username,
-      //   }
-      // }))
+    const fetchProfileData = async () => {
+      if (!currentUser || !isAuthenticated) {
+        console.log('ProfileEdit: No user data available')
+        setIsLoading(false)
+        return
+      }
+
+      try {
+        console.log('ProfileEdit: Fetching profile for user:', currentUser.username)
+        setIsLoading(true)
+        
+        // Fetch full profile data from backend using /me endpoint for current user
+        const profileResponse = await profileAPI.getCurrentUserProfile()
+        const userData = profileResponse.user
+
+        console.log('ProfileEdit: Profile data received:', userData)
+
+        // Map backend data to frontend structure
+        const mappedData = {
+          personalInfo: {
+            firstName: userData.firstName || "",
+            lastName: userData.lastName || "",
+            username: userData.username || "",
+            email: userData.email || "",
+            phone: userData.phone || "",
+            location: typeof userData.location === 'object' && userData.location ? 
+              `${userData.location.city || ''} ${userData.location.state || ''} ${userData.location.country || ''}`.trim() || '' :
+              userData.location || "",
+            website: userData.website || "",
+            bio: userData.bio || "",
+            avatar: userData.avatar || "",
+            coverImage: userData.coverImage || "",
+          },
+          professionalInfo: {
+            title: userData.title || "",
+            company: userData.company || "",
+            experienceLevel: userData.experienceLevel || "Student / Learning to code",
+            primarySkill: userData.primarySkill || "Frontend Development",
+            hourlyRate: userData.hourlyRate || "",
+            availability: userData.availability || "Available for freelance",
+            workType: userData.workType || "Remote",
+          },
+          socialLinks: {
+            github: userData.github || "",
+            linkedin: userData.linkedin || "",
+            twitter: userData.twitter || "",
+            portfolio: userData.portfolio || "",
+            blog: userData.blog || "",
+          },
+          skills: Array.isArray(userData.skills) ? 
+            userData.skills.map((skill, index) => ({
+              id: index + 1,
+              name: typeof skill === 'string' ? skill : skill.name || '',
+              level: typeof skill === 'object' ? skill.level || 50 : 50,
+              category: typeof skill === 'object' ? skill.category || 'Frontend' : 'Frontend'
+            })) : [],
+          experience: userData.experience || [],
+          education: userData.education || [],
+        }
+
+        setProfileData(mappedData)
+      } catch (error) {
+        console.error('ProfileEdit: Error fetching profile data:', error)
+        toast.error('Failed to load profile data')
+        // Keep initial empty data on error
+      } finally {
+        setIsLoading(false)
+      }
     }
+
+    fetchProfileData()
   }, [currentUser, isAuthenticated])
 
   const updatePersonalInfo = (field, value) => {
@@ -236,52 +252,150 @@ export default function ProfileEdit() {
     setHasUnsavedChanges(true)
   }
 
-  const handleSave = () => {
-    // Handle save logic here
-    console.log("Saving profile data:", profileData)
-    setHasUnsavedChanges(false)
-    // Show success message
+  const handleSave = async () => {
+    if (!currentUser || !isAuthenticated) {
+      toast.error('Please log in to save your profile')
+      return
+    }
+
+    try {
+      setIsSaving(true)
+      console.log('ProfileEdit: Saving profile data for:', currentUser.username)
+
+      // Flatten the profile data for backend - only send fields that backend accepts
+      const updateData = {
+        firstName: profileData.personalInfo.firstName,
+        lastName: profileData.personalInfo.lastName,
+        email: profileData.personalInfo.email,
+        bio: profileData.personalInfo.bio,
+        avatar: profileData.personalInfo.avatar,
+        location: profileData.personalInfo.location, // Will be converted to object in backend
+        title: profileData.professionalInfo.title,
+        company: profileData.professionalInfo.company,
+        website: profileData.personalInfo.website,
+        github: profileData.socialLinks.github,
+        linkedin: profileData.socialLinks.linkedin,
+        twitter: profileData.socialLinks.twitter,
+        skills: profileData.skills.map(skill => skill.name), // Backend expects array of strings
+      }
+
+      // Remove empty values to avoid validation issues
+      Object.keys(updateData).forEach(key => {
+        if (updateData[key] === undefined || updateData[key] === null || 
+            (Array.isArray(updateData[key]) && updateData[key].length === 0) ||
+            (typeof updateData[key] === 'string' && updateData[key].trim() === '')) {
+          delete updateData[key];
+        }
+      });
+
+      console.log('ProfileEdit: Sending update data:', updateData)
+
+      // Save to backend
+      const response = await profileAPI.updateProfile(updateData)
+      console.log('ProfileEdit: Profile updated successfully:', response)
+
+      // Update Redux store with new user data
+      if (response.user) {
+        dispatch(updateUser(response.user))
+      }
+
+      toast.success('Profile updated successfully!')
+      setHasUnsavedChanges(false)
+
+    
+
+    } catch (error) {
+      console.error('ProfileEdit: Error saving profile:', error)
+      console.error('ProfileEdit: Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      })
+      
+      // Show more specific error messages
+      let errorMessage = 'Failed to update profile'
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
+      toast.error(errorMessage)
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Navigation */}
-      <div className="navbar bg-white border-b border-gray-200 sticky top-0 z-50">
-        <div className="navbar-start">
-          <Link to="/home" className="btn btn-ghost normal-case text-xl text-gray-800">
-            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center mr-2">
-              <Code2 className="h-5 w-5 text-white" />
-            </div>
-            DevConnect Pro
-          </Link>
+      {/* Show loading state if data is loading */}
+      {isLoading ? (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <div className="loading loading-spinner loading-lg text-indigo-600 mb-4"></div>
+            <p className="text-gray-600">Loading profile data...</p>
+          </div>
         </div>
-        
-        <div className="navbar-end space-x-2">
-          <button 
-            className="btn btn-outline btn-sm text-gray-600 border-gray-300 hover:bg-gray-50" 
-            onClick={() => setIsPreviewMode(!isPreviewMode)}
-          >
-            <Eye className="h-4 w-4 mr-2" />
-            {isPreviewMode ? "Edit Mode" : "Preview"}
-          </button>
-
-          {hasUnsavedChanges && (
-            <button onClick={handleSave} className="btn btn-primary btn-sm bg-indigo-600 hover:bg-indigo-700 border-indigo-600">
-              <Save className="h-4 w-4 mr-2" />
-              Save Changes
+      ) : !currentUser || !isAuthenticated ? (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-gray-600 mb-4">Please log in to edit your profile</p>
+            <button 
+              onClick={() => navigate('/login')} 
+              className="btn btn-primary bg-indigo-600 hover:bg-indigo-700 border-indigo-600"
+            >
+              Login
             </button>
-          )}
-
-          <Link to="/profile/johndoe" className="btn btn-ghost btn-sm text-gray-600 hover:bg-gray-50">
-            View Profile
-          </Link>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="min-h-screen bg-white">
+          {/* Navigation */}
+          <div className="navbar bg-white border-b border-gray-200 sticky top-0 z-50">
+            <div className="navbar-start">
+              <Link to="/home" className="btn btn-ghost normal-case text-xl text-gray-800">
+                <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center mr-2">
+                  <Code2 className="h-5 w-5 text-white" />
+                </div>
+                DevConnect Pro
+              </Link>
+            </div>
+            
+            <div className="navbar-end space-x-2">
+              <button 
+                className="btn btn-outline btn-sm text-gray-600 border-gray-300 hover:bg-gray-50" 
+                onClick={() => setIsPreviewMode(!isPreviewMode)}
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                {isPreviewMode ? "Edit Mode" : "Preview"}
+              </button>
 
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Update Profile</h1>
-          <p className="text-gray-600 mt-2">Keep your professional profile up to date</p>
+              {hasUnsavedChanges && (
+                <button onClick={handleSave} className="btn btn-primary btn-sm bg-indigo-600 hover:bg-indigo-700 border-indigo-600" disabled={isSaving}>
+                  {isSaving ? (
+                    <>
+                      <span className="loading loading-spinner loading-xs"></span>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Changes
+                    </>
+                  )}
+                </button>
+              )}
+
+              <Link to={`/profile/${currentUser.username}`} className="btn btn-ghost btn-sm text-gray-600 hover:bg-gray-50">
+                View Profile
+              </Link>
+            </div>
+          </div>
+
+          <div className="container mx-auto px-4 py-8 max-w-4xl">
+            <div className="mb-8">
+              <h1 className="text-3xl font-bold text-gray-900">Update Profile</h1>
+              <p className="text-gray-600 mt-2">Keep your professional profile up to date</p>
           {hasUnsavedChanges && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4 flex items-center">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-600 mr-3" fill="none" viewBox="0 0 24 24">
@@ -422,7 +536,7 @@ export default function ProfileEdit() {
                     </label>
                     <input
                       type="text"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-gray-900 bg-white"
                       value={profileData.personalInfo.firstName}
                       onChange={(e) => updatePersonalInfo("firstName", e.target.value)}
                       placeholder="John"
@@ -434,7 +548,7 @@ export default function ProfileEdit() {
                     </label>
                     <input
                       type="text"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-gray-900 bg-white"
                       value={profileData.personalInfo.lastName}
                       onChange={(e) => updatePersonalInfo("lastName", e.target.value)}
                       placeholder="Doe"
@@ -444,13 +558,13 @@ export default function ProfileEdit() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Username *
+                    Username * (Cannot be changed)
                   </label>
                   <input
                     type="text"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
                     value={profileData.personalInfo.username}
-                    onChange={(e) => updatePersonalInfo("username", e.target.value)}
+                    disabled
                     placeholder="johndoe"
                   />
                   <p className="text-sm text-gray-500 mt-1">Your profile URL: devconnect.pro/{profileData.personalInfo.username}</p>
@@ -463,7 +577,7 @@ export default function ProfileEdit() {
                     </label>
                     <input
                       type="email"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-gray-900 bg-white"
                       value={profileData.personalInfo.email}
                       onChange={(e) => updatePersonalInfo("email", e.target.value)}
                       placeholder="john.doe@example.com"
@@ -475,7 +589,7 @@ export default function ProfileEdit() {
                     </label>
                     <input
                       type="tel"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-gray-900 bg-white"
                       value={profileData.personalInfo.phone}
                       onChange={(e) => updatePersonalInfo("phone", e.target.value)}
                       placeholder="+1 (555) 123-4567"
@@ -491,7 +605,7 @@ export default function ProfileEdit() {
                     <div className="relative">
                       <input
                         type="text"
-                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-gray-900 bg-white"
                         value={profileData.personalInfo.location}
                         onChange={(e) => updatePersonalInfo("location", e.target.value)}
                         placeholder="San Francisco, CA"
@@ -506,7 +620,7 @@ export default function ProfileEdit() {
                     <div className="relative">
                       <input
                         type="url"
-                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-gray-900 bg-white"
                         value={profileData.personalInfo.website}
                         onChange={(e) => updatePersonalInfo("website", e.target.value)}
                         placeholder="https://johndoe.dev"
@@ -521,7 +635,7 @@ export default function ProfileEdit() {
                     Bio
                   </label>
                   <textarea
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors h-24 resize-y"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors h-24 resize-y text-gray-900 bg-white"
                     value={profileData.personalInfo.bio}
                     onChange={(e) => updatePersonalInfo("bio", e.target.value)}
                     placeholder="Tell us about yourself, your interests, and what you're passionate about..."
@@ -550,7 +664,7 @@ export default function ProfileEdit() {
                 <div className="relative">
                   <input
                     type="text"
-                    className="w-full px-3 py-2 pl-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-3 py-2 pl-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 bg-white"
                     value={profileData.professionalInfo.title}
                     onChange={(e) => updateProfessionalInfo("title", e.target.value)}
                     placeholder="Senior Full-Stack Developer"
@@ -566,7 +680,7 @@ export default function ProfileEdit() {
                   </label>
                   <input
                     type="text"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 bg-white"
                     value={profileData.professionalInfo.company}
                     onChange={(e) => updateProfessionalInfo("company", e.target.value)}
                     placeholder="TechCorp Inc."
@@ -577,7 +691,7 @@ export default function ProfileEdit() {
                     Work Type
                   </label>
                   <select 
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 bg-white"
                     value={profileData.professionalInfo.workType}
                     onChange={(e) => updateProfessionalInfo("workType", e.target.value)}
                   >
@@ -595,7 +709,7 @@ export default function ProfileEdit() {
                     <span className="label-text">Experience Level</span>
                   </label>
                   <select 
-                    className="select select-bordered"
+                    className="select select-bordered text-gray-900 bg-white"
                     value={profileData.professionalInfo.experienceLevel}
                     onChange={(e) => updateProfessionalInfo("experienceLevel", e.target.value)}
                   >
@@ -611,7 +725,7 @@ export default function ProfileEdit() {
                     Primary Focus Area
                   </label>
                   <select 
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-gray-900 bg-white"
                     value={profileData.professionalInfo.primarySkill}
                     onChange={(e) => updateProfessionalInfo("primarySkill", e.target.value)}
                   >
@@ -631,7 +745,7 @@ export default function ProfileEdit() {
                   </label>
                   <input
                     type="text"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-gray-900 bg-white"
                     value={profileData.professionalInfo.hourlyRate}
                     onChange={(e) => updateProfessionalInfo("hourlyRate", e.target.value)}
                     placeholder="$85"
@@ -642,7 +756,7 @@ export default function ProfileEdit() {
                     Availability
                   </label>
                   <select 
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-gray-900 bg-white"
                     value={profileData.professionalInfo.availability}
                     onChange={(e) => updateProfessionalInfo("availability", e.target.value)}
                   >
@@ -674,7 +788,7 @@ export default function ProfileEdit() {
                     </label>
                     <input
                       type="text"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-gray-900 bg-white"
                       value={newSkill.name}
                       onChange={(e) => setNewSkill({ ...newSkill, name: e.target.value })}
                       placeholder="JavaScript"
@@ -685,7 +799,7 @@ export default function ProfileEdit() {
                       Category
                     </label>
                     <select 
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-gray-900 bg-white"
                       value={newSkill.category}
                       onChange={(e) => setNewSkill({ ...newSkill, category: e.target.value })}
                     >
@@ -736,7 +850,7 @@ export default function ProfileEdit() {
                         </label>
                         <input 
                           type="text"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-gray-900 bg-white"
                           value={skill.name} 
                           onChange={(e) => updateSkill(index, "name", e.target.value)} 
                         />
@@ -746,7 +860,7 @@ export default function ProfileEdit() {
                           Category
                         </label>
                         <select 
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-gray-900 bg-white"
                           value={skill.category}
                           onChange={(e) => updateSkill(index, "category", e.target.value)}
                         >
@@ -829,7 +943,7 @@ export default function ProfileEdit() {
                           </label>
                           <input
                             type="text"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-gray-900 bg-white"
                             value={exp.title}
                             onChange={(e) => updateExperience(exp.id, "title", e.target.value)}
                             placeholder="Senior Full-Stack Developer"
@@ -841,7 +955,7 @@ export default function ProfileEdit() {
                           </label>
                           <input
                             type="text"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-gray-900 bg-white"
                             value={exp.company}
                             onChange={(e) => updateExperience(exp.id, "company", e.target.value)}
                             placeholder="TechCorp Inc."
@@ -855,7 +969,7 @@ export default function ProfileEdit() {
                         </label>
                         <input
                           type="text"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-gray-900 bg-white"
                           value={exp.location}
                           onChange={(e) => updateExperience(exp.id, "location", e.target.value)}
                           placeholder="San Francisco, CA"
@@ -869,7 +983,7 @@ export default function ProfileEdit() {
                           </label>
                           <input
                             type="month"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-gray-900 bg-white"
                             value={exp.startDate}
                             onChange={(e) => updateExperience(exp.id, "startDate", e.target.value)}
                           />
@@ -880,7 +994,7 @@ export default function ProfileEdit() {
                           </label>
                           <input
                             type="month"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors disabled:bg-gray-100 disabled:text-gray-500"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors disabled:bg-gray-100 disabled:text-gray-500 text-gray-900 bg-white"
                             value={exp.endDate}
                             onChange={(e) => updateExperience(exp.id, "endDate", e.target.value)}
                             disabled={exp.current}
@@ -893,7 +1007,7 @@ export default function ProfileEdit() {
                           <div className="flex items-center space-x-2 pt-2">
                             <input
                               type="checkbox"
-                              className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                              className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 bg-white"
                               checked={exp.current}
                               onChange={(e) => updateExperience(exp.id, "current", e.target.checked)}
                             />
@@ -907,7 +1021,7 @@ export default function ProfileEdit() {
                           Description
                         </label>
                         <textarea
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors h-20 resize-y"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors h-20 resize-y text-gray-900 bg-white"
                           value={exp.description}
                           onChange={(e) => updateExperience(exp.id, "description", e.target.value)}
                           placeholder="Describe your role, responsibilities, and achievements..."
@@ -936,7 +1050,7 @@ export default function ProfileEdit() {
                         </div>
                         <input
                           type="text"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-gray-900 bg-white"
                           placeholder="Add technology (press Enter)"
                           onKeyPress={(e) => {
                             if (e.key === "Enter") {
@@ -976,7 +1090,7 @@ export default function ProfileEdit() {
                     </span>
                     <input
                       type="text"
-                      className="flex-1 px-3 py-2 outline-none"
+                      className="flex-1 px-3 py-2 outline-none text-gray-900 bg-white"
                       value={profileData.socialLinks.github}
                       onChange={(e) => updateSocialLinks("github", e.target.value)}
                       placeholder="johndoe"
@@ -995,7 +1109,7 @@ export default function ProfileEdit() {
                     </span>
                     <input
                       type="text"
-                      className="flex-1 px-3 py-2 outline-none"
+                      className="flex-1 px-3 py-2 outline-none text-gray-900 bg-white"
                       value={profileData.socialLinks.linkedin}
                       onChange={(e) => updateSocialLinks("linkedin", e.target.value)}
                       placeholder="johndoe"
@@ -1014,7 +1128,7 @@ export default function ProfileEdit() {
                     </span>
                     <input
                       type="text"
-                      className="flex-1 px-3 py-2 outline-none"
+                      className="flex-1 px-3 py-2 outline-none text-gray-900 bg-white"
                       value={profileData.socialLinks.twitter}
                       onChange={(e) => updateSocialLinks("twitter", e.target.value)}
                       placeholder="johndoe"
@@ -1029,7 +1143,7 @@ export default function ProfileEdit() {
                   </label>
                   <input
                     type="url"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-gray-900 bg-white"
                     value={profileData.socialLinks.portfolio}
                     onChange={(e) => updateSocialLinks("portfolio", e.target.value)}
                     placeholder="https://johndoe.dev"
@@ -1043,7 +1157,7 @@ export default function ProfileEdit() {
                   </label>
                   <input
                     type="url"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-gray-900 bg-white"
                     value={profileData.socialLinks.blog}
                     onChange={(e) => updateSocialLinks("blog", e.target.value)}
                     placeholder="https://blog.johndoe.dev"
@@ -1057,20 +1171,31 @@ export default function ProfileEdit() {
         {/* Save Button */}
         <div className="flex justify-end pt-6 border-t border-gray-200 mt-8">
           <div className="flex items-center space-x-4">
-            <Link to="/profile/johndoe" className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+            <Link to={`/profile/${currentUser.username}`} className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">
               Cancel
             </Link>
             <button 
               onClick={handleSave} 
               className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center disabled:bg-gray-400 disabled:cursor-not-allowed" 
-              disabled={!hasUnsavedChanges}
+              disabled={!hasUnsavedChanges || isSaving}
             >
-              <Save className="h-4 w-4 mr-2" />
-              {hasUnsavedChanges ? "Save Changes" : "All Changes Saved"}
+              {isSaving ? (
+                <>
+                  <span className="loading loading-spinner loading-xs mr-2"></span>
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  {hasUnsavedChanges ? "Save Changes" : "All Changes Saved"}
+                </>
+              )}
             </button>
           </div>
         </div>
-      </div>
+        </div>
+        </div>
+      )}
     </div>
   )
 }
