@@ -258,7 +258,7 @@ const Profile = () => {
       {/* Navigation Bar */}
       <div className="navbar bg-white shadow-sm sticky top-0 z-50 border-b border-slate-200">
         <div className="navbar-start">
-          <Link to="/home" className="btn btn-ghost text-xl text-slate-900">
+          <Link to="/home" className="btn btn-ghost text-xl text-slate-900 hover:text-indigo-600 hover:bg-slate-50">
             <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
               <Code2 className="h-5 w-5 text-white" />
             </div>
@@ -266,28 +266,17 @@ const Profile = () => {
           </Link>
         </div>
         
-        <div className="navbar-center hidden lg:flex flex-1 max-w-lg">
-          <div className="form-control w-full">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <input 
-                type="text" 
-                placeholder="Search developers, projects, skills..." 
-                className="input input-bordered w-full pl-10 border-slate-300 focus:border-indigo-500"
-              />
-            </div>
-          </div>
-        </div>
+        {/* Search removed as requested */}
 
         <div className="navbar-end">
           <div className="flex items-center gap-2">
-            <button className="btn btn-ghost btn-circle text-slate-600">
+            <button className="btn btn-ghost btn-circle text-slate-600 hover:text-slate-700 hover:bg-slate-100">
               <Bell className="h-5 w-5" />
             </button>
-            <button className="btn btn-ghost btn-circle text-slate-600">
+            <button className="btn btn-ghost btn-circle text-slate-600 hover:text-slate-700 hover:bg-slate-100">
               <MessageSquare className="h-5 w-5" />
             </button>
-            <button className="btn btn-ghost btn-circle text-slate-600">
+            <button className="btn btn-ghost btn-circle text-slate-600 hover:text-slate-700 hover:bg-slate-100">
               <Share className="h-5 w-5" />
             </button>
             
@@ -305,7 +294,7 @@ const Profile = () => {
               </div>
               <ul tabIndex={0} className="menu menu-sm dropdown-content bg-white rounded-box z-[1] mt-3 w-52 p-2 shadow border border-slate-200">
                 <li>
-                  <Link to={`/profile/${currentUser?.username}`} className="justify-between text-slate-700 hover:text-indigo-600">
+                  <Link to={`/profile/${currentUser?.username}`} className="justify-between text-slate-700 hover:text-indigo-600 hover:bg-slate-50">
                     <span className="flex items-center gap-2">
                       <User className="h-4 w-4" />
                       My Profile
@@ -313,13 +302,13 @@ const Profile = () => {
                   </Link>
                 </li>
                 <li>
-                  <a className="flex items-center gap-2 text-slate-700 hover:text-indigo-600">
+                  <a className="flex items-center gap-2 text-slate-700 hover:text-indigo-600 hover:bg-slate-50">
                     <Settings className="h-4 w-4" />
                     Settings
                   </a>
                 </li>
                 <li>
-                  <button onClick={handleLogout} className="flex items-center gap-2 text-red-600 hover:text-red-700">
+                  <button onClick={handleLogout} className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50">
                     <LogOut className="h-4 w-4" />
                     Logout
                   </button>
@@ -656,21 +645,33 @@ const Profile = () => {
           <div className="lg:col-span-2">
             <div className="w-full">
               {/* Tabs */}
-              <div className="tabs tabs-boxed bg-white border border-slate-200 mb-6">
+              <div className="bg-gray-100 rounded-lg p-1 mb-6 flex">
                 <button 
-                  className={`tab ${activeTab === 'overview' ? 'tab-active' : ''}`}
+                  className={`flex-1 text-center py-2 px-4 rounded-md font-medium transition-all ${
+                    activeTab === 'overview' 
+                      ? 'bg-white text-gray-900 shadow-sm' 
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
                   onClick={() => setActiveTab('overview')}
                 >
                   Overview
                 </button>
                 <button 
-                  className={`tab ${activeTab === 'projects' ? 'tab-active' : ''}`}
+                  className={`flex-1 text-center py-2 px-4 rounded-md font-medium transition-all ${
+                    activeTab === 'projects' 
+                      ? 'bg-white text-gray-900 shadow-sm' 
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
                   onClick={() => setActiveTab('projects')}
                 >
                   Projects
                 </button>
                 <button 
-                  className={`tab ${activeTab === 'experience' ? 'tab-active' : ''}`}
+                  className={`flex-1 text-center py-2 px-4 rounded-md font-medium transition-all ${
+                    activeTab === 'experience' 
+                      ? 'bg-white text-gray-900 shadow-sm' 
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
                   onClick={() => setActiveTab('experience')}
                 >
                   Experience
@@ -723,12 +724,12 @@ const Profile = () => {
                                   </div>
                                   <div className="flex items-center gap-2">
                                     {project.liveUrl && (
-                                      <a href={project.liveUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm">
+                                      <a href={project.liveUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm hover:bg-slate-100">
                                         <ExternalLink className="h-4 w-4" />
                                       </a>
                                     )}
                                     {project.githubUrl && (
-                                      <a href={project.githubUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm">
+                                      <a href={project.githubUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm hover:bg-slate-100">
                                         <Github className="h-4 w-4" />
                                       </a>
                                     )}
@@ -820,13 +821,13 @@ const Profile = () => {
                                 </div>
                                 <div className="flex items-center gap-2">
                                   {project.liveUrl && (
-                                    <a href={project.liveUrl} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm border-slate-300">
+                                    <a href={project.liveUrl} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm border-slate-300 hover:bg-slate-50 hover:border-slate-400">
                                       <ExternalLink className="h-4 w-4 mr-2" />
                                       Live Demo
                                     </a>
                                   )}
                                   {project.githubUrl && (
-                                    <a href={project.githubUrl} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm border-slate-300">
+                                    <a href={project.githubUrl} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm border-slate-300 hover:bg-slate-50 hover:border-slate-400">
                                       <Github className="h-4 w-4 mr-2" />
                                       Code
                                     </a>
