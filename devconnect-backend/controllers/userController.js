@@ -159,21 +159,24 @@ exports.getUserProjects = async (req, res, next) => {
             return next(new ErrorResponse('User not found', 404));
         }
 
-        // Only show projects if viewing own profile
-        if (req.user.id !== user._id.toString()) {
-            return res.status(200).json({
-                success: true,
-                projects: []
-            });
+        // Get public projects for this user, or all projects if viewing own profile
+        const Project = require('../models/Project');
+        let query = { user: user._id };
+        
+        // If not viewing own profile, only show public projects
+        if (!req.user || req.user.id !== user._id.toString()) {
+            query.isPublic = true;
+            query.showInPortfolio = true;
         }
 
-        // Get projects for this user
-        const Project = require('../models/Project');
-        const projects = await Project.find({ createdBy: user._id });
+        const projects = await Project.find(query)
+            .populate('user', 'username avatar')
+            .sort({ featured: -1, createdAt: -1 }); // Featured projects first, then by creation date
 
         res.status(200).json({
             success: true,
-            projects
+            count: projects.length,
+            data: projects
         });
     } catch (err) {
         next(err);

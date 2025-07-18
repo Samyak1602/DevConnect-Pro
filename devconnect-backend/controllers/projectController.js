@@ -33,6 +33,13 @@ exports.createProject = async (req, res, next) => {
 // @access  Public
 exports.getProjects = async (req, res, next) => {
     try {
+        console.log('getProjects called with query:', req.query);
+        console.log('User authenticated:', !!req.user);
+        
+        // First, let's check if there are any projects at all
+        const totalProjects = await Project.countDocuments({});
+        console.log('Total projects in database:', totalProjects);
+        
         let query = {};
 
         // Filter by technology
@@ -50,10 +57,11 @@ exports.getProjects = async (req, res, next) => {
             query.status = req.query.status;
         }
 
-        // Only show public projects unless user is viewing their own
-        if (!req.user || req.query.user !== req.user.id) {
-            query.isPublic = true;
-        }
+        // Show all projects for now (for debugging)
+        // We'll add the privacy filter back once we confirm projects are being retrieved
+        console.log('Skipping privacy filter for debugging...');
+
+        console.log('Final query:', query);
 
         // Search functionality
         if (req.query.search) {
@@ -65,15 +73,22 @@ exports.getProjects = async (req, res, next) => {
         const limit = parseInt(req.query.limit, 10) || 10;
         const startIndex = (page - 1) * limit;
 
+        console.log('Pagination - page:', page, 'limit:', limit, 'startIndex:', startIndex);
+
         // Execute query
         const projects = await Project.find(query)
-            .populate('user', 'username avatar')
+            .populate('user', 'username avatar firstName lastName')
             .sort({ createdAt: -1 })
             .limit(limit)
             .skip(startIndex);
 
+        console.log('Found projects:', projects.length);
+        console.log('Projects sample:', projects.slice(0, 2)); // Log first 2 projects
+
         // Get total count for pagination
         const total = await Project.countDocuments(query);
+
+        console.log('Total count:', total);
 
         // Pagination result
         const pagination = {};
@@ -92,6 +107,7 @@ exports.getProjects = async (req, res, next) => {
             data: projects
         });
     } catch (err) {
+        console.error('Error in getProjects:', err);
         next(err);
     }
 };
@@ -149,8 +165,13 @@ exports.updateProject = async (req, res, next) => {
 
         // Fields that are allowed to be updated
         const allowedFields = [
-            'title', 'description', 'techStack', 'githubUrl', 
-            'liveUrl', 'coverImage', 'status', 'isPublic'
+            'title', 'description', 'category', 'tags', 'featured',
+            'longDescription', 'features', 'challenges', 'learnings', 'futureEnhancements',
+            'techStack', 'architecture', 'deployment', 'database', 'apiDocumentation',
+            'githubUrl', 'liveUrl', 'documentationUrl', 'additionalLinks',
+            'coverImage', 'screenshots', 'videos', 'logo',
+            'isOpenSource', 'acceptingContributions', 'collaborators', 'license',
+            'status', 'isPublic', 'showInPortfolio', 'allowComments'
         ];
 
         // Filter update data

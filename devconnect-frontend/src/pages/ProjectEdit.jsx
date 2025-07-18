@@ -16,9 +16,10 @@ import {
   Camera,
 } from "lucide-react"
 import { Link, useNavigate } from "react-router-dom"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useSelector } from "react-redux"
 import { selectUser, selectIsAuthenticated } from "../features/auth/authSlice"
+import { projectsAPI, uploadAPI } from "../services/api"
 import toast from 'react-hot-toast'
 
 const projectCategories = [
@@ -121,6 +122,7 @@ const initialProjectData = {
     videos: [],
     logo: "",
     coverImage: "",
+    coverImageFile: null,
   },
   collaboration: {
     isOpenSource: true,
@@ -147,6 +149,26 @@ export default function ProjectEdit() {
   const [newLink, setNewLink] = useState({ title: "", url: "" })
   const [isPreviewMode, setIsPreviewMode] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [uploadingCover, setUploadingCover] = useState(false)
+  const [coverImagePreview, setCoverImagePreview] = useState("")
+
+  // Check authentication on component mount
+  useEffect(() => {
+    if (!isAuthenticated) {
+      toast.error('Please login to create a project')
+      navigate('/login')
+    }
+  }, [isAuthenticated, navigate])
+
+  // Cleanup effect for object URLs
+  useEffect(() => {
+    return () => {
+      if (coverImagePreview) {
+        URL.revokeObjectURL(coverImagePreview)
+      }
+    }
+  }, [coverImagePreview])
 
   const updateBasicInfo = (field, value) => {
     setProjectData((prev) => ({
@@ -252,20 +274,238 @@ export default function ProjectEdit() {
     )
   }
 
-  const handleSave = () => {
-    // Handle save logic here
-    console.log("Saving project data:", projectData)
-    setHasUnsavedChanges(false)
-    toast.success("Project saved as draft!")
-    // Show success message and redirect
+  const handleCoverImageUpload = async (event) => {
+    const file = event.target.files[0]
+    if (!file) return
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Please upload a valid image file (JPEG, PNG, WebP)')
+      return
+    }
+
+    // Validate file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size should be less than 5MB')
+      return
+    }
+
+    try {
+      setUploadingCover(true)
+      
+      // Create preview
+      const previewUrl = URL.createObjectURL(file)
+      setCoverImagePreview(previewUrl)
+      
+      // For now, just store the file in projectData
+      // We'll upload it when the project is saved/published
+      setProjectData(prev => ({
+        ...prev,
+        media: { ...prev.media, coverImage: previewUrl, coverImageFile: file }
+      }))
+      
+      setHasUnsavedChanges(true)
+      toast.success('Cover image selected successfully!')
+      
+    } catch (error) {
+      console.error('Error handling cover image:', error)
+      toast.error('Failed to process cover image')
+    } finally {
+      setUploadingCover(false)
+    }
   }
 
-  const handlePublish = () => {
-    // Handle publish logic here
-    console.log("Publishing project:", projectData)
-    setHasUnsavedChanges(false)
-    toast.success("Project published successfully!")
-    // Show success message and redirect to project page
+  const removeCoverImage = () => {
+    if (coverImagePreview) {
+      URL.revokeObjectURL(coverImagePreview)
+    }
+    setCoverImagePreview("")
+    setProjectData(prev => ({
+      ...prev,
+      media: { ...prev.media, coverImage: "", coverImageFile: null }
+    }))
+    setHasUnsavedChanges(true)
+  }
+
+  const handleSave = async () => {
+    try {
+      setIsLoading(true)
+      
+      // First create the project
+      const transformedData = {
+        // Basic information
+        title: projectData.basic.title,
+        description: projectData.basic.description,
+        category: projectData.basic.category,
+        status: projectData.basic.status,
+        tags: projectData.basic.tags,
+        featured: projectData.basic.featured,
+        
+        // Details
+        longDescription: projectData.details.longDescription,
+        features: projectData.details.features,
+        challenges: projectData.details.challenges,
+        learnings: projectData.details.learnings,
+        futureEnhancements: projectData.details.futureEnhancements,
+        
+        // Technical
+        techStack: projectData.technical.technologies,
+        architecture: projectData.technical.architecture,
+        deployment: projectData.technical.deployment,
+        database: projectData.technical.database,
+        apiDocumentation: projectData.technical.apiDocumentation,
+        
+        // Links
+        githubUrl: projectData.links.githubUrl,
+        liveUrl: projectData.links.liveUrl,
+        documentationUrl: projectData.links.documentationUrl,
+        additionalLinks: projectData.links.additionalLinks,
+        
+        // Media (without file, we'll upload that separately)
+        coverImage: "", // Will be updated after upload
+        screenshots: projectData.media.screenshots,
+        videos: projectData.media.videos,
+        logo: projectData.media.logo,
+        
+        // Collaboration
+        isOpenSource: projectData.collaboration.isOpenSource,
+        acceptingContributions: projectData.collaboration.acceptingContributions,
+        collaborators: projectData.collaboration.collaborators,
+        license: projectData.collaboration.license,
+        
+        // Visibility - save as private for draft
+        isPublic: false,
+        showInPortfolio: projectData.visibility.showInPortfolio,
+        allowComments: projectData.visibility.allowComments,
+      }
+
+      const response = await projectsAPI.createProject(transformedData)
+      
+      if (response.success) {
+        const projectId = response.data._id
+        
+        // Upload cover image if one was selected
+        if (projectData.media.coverImageFile) {
+          try {
+            const uploadResponse = await uploadAPI.uploadProjectCover(projectId, projectData.media.coverImageFile)
+            if (uploadResponse.success) {
+              toast.success('Project saved with cover image successfully!')
+            }
+          } catch (uploadError) {
+            console.error('Error uploading cover image:', uploadError)
+            toast.success('Project saved, but cover image upload failed')
+          }
+        } else {
+          toast.success('Project saved as draft successfully!')
+        }
+        
+        setHasUnsavedChanges(false)
+        navigate('/home')
+      }
+    } catch (error) {
+      console.error('Error saving project:', error)
+      toast.error(error.message || 'Failed to save project')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handlePublish = async () => {
+    try {
+      // Validate required fields before publishing
+      if (!projectData.basic.title.trim()) {
+        toast.error('Project title is required')
+        return
+      }
+      if (!projectData.basic.description.trim()) {
+        toast.error('Project description is required')
+        return
+      }
+      if (projectData.technical.technologies.length === 0) {
+        toast.error('At least one technology is required')
+        return
+      }
+
+      setIsLoading(true)
+
+      // First create the project
+      const transformedData = {
+        // Basic information
+        title: projectData.basic.title,
+        description: projectData.basic.description,
+        category: projectData.basic.category,
+        status: projectData.basic.status,
+        tags: projectData.basic.tags,
+        featured: projectData.basic.featured,
+        
+        // Details
+        longDescription: projectData.details.longDescription,
+        features: projectData.details.features,
+        challenges: projectData.details.challenges,
+        learnings: projectData.details.learnings,
+        futureEnhancements: projectData.details.futureEnhancements,
+        
+        // Technical
+        techStack: projectData.technical.technologies,
+        architecture: projectData.technical.architecture,
+        deployment: projectData.technical.deployment,
+        database: projectData.technical.database,
+        apiDocumentation: projectData.technical.apiDocumentation,
+        
+        // Links
+        githubUrl: projectData.links.githubUrl,
+        liveUrl: projectData.links.liveUrl,
+        documentationUrl: projectData.links.documentationUrl,
+        additionalLinks: projectData.links.additionalLinks,
+        
+        // Media (without file, we'll upload that separately)
+        coverImage: "", // Will be updated after upload
+        screenshots: projectData.media.screenshots,
+        videos: projectData.media.videos,
+        logo: projectData.media.logo,
+        
+        // Collaboration
+        isOpenSource: projectData.collaboration.isOpenSource,
+        acceptingContributions: projectData.collaboration.acceptingContributions,
+        collaborators: projectData.collaboration.collaborators,
+        license: projectData.collaboration.license,
+        
+        // Visibility - publish as public
+        isPublic: projectData.visibility.isPublic,
+        showInPortfolio: projectData.visibility.showInPortfolio,
+        allowComments: projectData.visibility.allowComments,
+      }
+
+      const response = await projectsAPI.createProject(transformedData)
+      
+      if (response.success) {
+        const projectId = response.data._id
+        
+        // Upload cover image if one was selected
+        if (projectData.media.coverImageFile) {
+          try {
+            const uploadResponse = await uploadAPI.uploadProjectCover(projectId, projectData.media.coverImageFile)
+            if (uploadResponse.success) {
+              toast.success('Project published with cover image successfully!')
+            }
+          } catch (uploadError) {
+            console.error('Error uploading cover image:', uploadError)
+            toast.success('Project published, but cover image upload failed')
+          }
+        } else {
+          toast.success('Project published successfully!')
+        }
+        
+        setHasUnsavedChanges(false)
+        navigate('/home')
+      }
+    } catch (error) {
+      console.error('Error publishing project:', error)
+      toast.error(error.message || 'Failed to publish project')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   // Check authentication
@@ -309,18 +549,20 @@ export default function ProjectEdit() {
 
           <button 
             onClick={handleSave} 
-            className="btn btn-outline btn-sm text-gray-600 border-gray-300 hover:bg-gray-50"
+            disabled={isLoading}
+            className="btn btn-outline btn-sm text-gray-600 border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="h-4 w-4 mr-2" />
-            Save Draft
+            {isLoading ? 'Saving...' : 'Save Draft'}
           </button>
 
           <button 
             onClick={handlePublish} 
-            className="btn btn-primary btn-sm bg-indigo-600 hover:bg-indigo-700 border-indigo-600"
+            disabled={isLoading}
+            className="btn btn-primary btn-sm bg-indigo-600 hover:bg-indigo-700 border-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Globe className="h-4 w-4 mr-2" />
-            Publish Project
+            {isLoading ? 'Publishing...' : 'Publish Project'}
           </button>
         </div>
       </div>
@@ -515,7 +757,7 @@ export default function ProjectEdit() {
                   <input
                     type="checkbox"
                     id="featured"
-                    className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 bg-white"
+                    className="checkbox checkbox-primary"
                     checked={projectData.basic.featured}
                     onChange={(e) => updateBasicInfo("featured", e.target.checked)}
                   />
@@ -752,18 +994,66 @@ export default function ProjectEdit() {
                 {/* Cover Image */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Cover Image</label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-indigo-400 transition-colors">
-                    <div className="flex flex-col items-center space-y-2">
-                      <ImageIcon className="h-12 w-12 text-gray-400" />
-                      <div>
-                        <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center">
-                          <Upload className="h-4 w-4 mr-2" />
-                          Upload Cover Image
+                  {(projectData.media.coverImage || coverImagePreview) ? (
+                    <div className="space-y-4">
+                      <div className="relative">
+                        <img 
+                          src={coverImagePreview || projectData.media.coverImage} 
+                          alt="Cover preview" 
+                          className="w-full h-48 object-cover rounded-lg border border-gray-300"
+                        />
+                        <button
+                          onClick={removeCoverImage}
+                          className="absolute top-2 right-2 p-1 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors"
+                        >
+                          <X className="h-4 w-4" />
                         </button>
                       </div>
-                      <p className="text-sm text-gray-500">PNG, JPG up to 5MB. Recommended: 1200x630px</p>
+                      <div className="flex gap-2">
+                        <label className="cursor-pointer">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleCoverImageUpload}
+                            className="hidden"
+                            disabled={uploadingCover}
+                          />
+                          <span className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center">
+                            <Upload className="h-4 w-4 mr-2" />
+                            {uploadingCover ? 'Uploading...' : 'Change Image'}
+                          </span>
+                        </label>
+                        <button
+                          onClick={removeCoverImage}
+                          className="px-4 py-2 border border-red-300 text-red-700 rounded-lg hover:bg-red-50 transition-colors"
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-indigo-400 transition-colors">
+                      <div className="flex flex-col items-center space-y-2">
+                        <ImageIcon className="h-12 w-12 text-gray-400" />
+                        <div>
+                          <label className="cursor-pointer">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleCoverImageUpload}
+                              className="hidden"
+                              disabled={uploadingCover}
+                            />
+                            <span className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center">
+                              <Upload className="h-4 w-4 mr-2" />
+                              {uploadingCover ? 'Uploading...' : 'Upload Cover Image'}
+                            </span>
+                          </label>
+                        </div>
+                        <p className="text-sm text-gray-500">PNG, JPG up to 5MB. Recommended: 1200x630px</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Screenshots */}
@@ -952,7 +1242,7 @@ export default function ProjectEdit() {
                     </div>
                     <input
                       type="checkbox"
-                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 bg-white"
+                      className="checkbox checkbox-primary"
                       checked={projectData.collaboration.isOpenSource}
                       onChange={(e) => updateCollaboration("isOpenSource", e.target.checked)}
                     />
@@ -965,7 +1255,7 @@ export default function ProjectEdit() {
                     </div>
                     <input
                       type="checkbox"
-                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 bg-white"
+                      className="checkbox checkbox-primary"
                       checked={projectData.collaboration.acceptingContributions}
                       onChange={(e) => updateCollaboration("acceptingContributions", e.target.checked)}
                     />
@@ -1004,7 +1294,7 @@ export default function ProjectEdit() {
                     </div>
                     <input
                       type="checkbox"
-                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 bg-white"
+                      className="checkbox checkbox-primary"
                       checked={projectData.visibility.isPublic}
                       onChange={(e) => updateVisibility("isPublic", e.target.checked)}
                     />
@@ -1017,7 +1307,7 @@ export default function ProjectEdit() {
                     </div>
                     <input
                       type="checkbox"
-                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 bg-white"
+                      className="checkbox checkbox-primary"
                       checked={projectData.visibility.showInPortfolio}
                       onChange={(e) => updateVisibility("showInPortfolio", e.target.checked)}
                     />
@@ -1030,7 +1320,7 @@ export default function ProjectEdit() {
                     </div>
                     <input
                       type="checkbox"
-                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 bg-white"
+                      className="checkbox checkbox-primary"
                       checked={projectData.visibility.allowComments}
                       onChange={(e) => updateVisibility("allowComments", e.target.checked)}
                     />
@@ -1050,17 +1340,19 @@ export default function ProjectEdit() {
           <div className="flex items-center space-x-4">
             <button 
               onClick={handleSave} 
-              className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center"
+              disabled={isLoading}
+              className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Save className="h-4 w-4 mr-2" />
-              Save as Draft
+              {isLoading ? 'Saving...' : 'Save as Draft'}
             </button>
             <button 
               onClick={handlePublish} 
-              className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center"
+              disabled={isLoading}
+              className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Globe className="h-4 w-4 mr-2" />
-              Publish Project
+              {isLoading ? 'Publishing...' : 'Publish Project'}
             </button>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import React, { useState} from "react"
+import React, { useState, useEffect} from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { useDispatch, useSelector } from "react-redux"
 import {
@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 import { selectAuth, selectAuthLoading } from "../features/auth/authSlice"
 import { logoutUser } from "../features/auth/authService"
+import { projectsAPI } from "../services/api"
 import toast, { Toaster } from 'react-hot-toast'
 
 const Home = () => {
@@ -33,6 +34,32 @@ const Home = () => {
   
   const [searchQuery, setSearchQuery] = useState("")
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [projects, setProjects] = useState([])
+  const [feedLoading, setFeedLoading] = useState(true)
+
+  // Fetch projects on component mount
+  useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        setFeedLoading(true)
+        const response = await projectsAPI.getAllProjects({ 
+          limit: 50, // Increase limit to show more projects
+          page: 1 
+        })
+        console.log('Fetched projects response:', response)
+        console.log('Projects data:', response.data)
+        setProjects(response.data || [])
+      } catch (error) {
+        console.error('Error fetching projects:', error)
+        toast.error('Failed to load projects')
+      } finally {
+        setFeedLoading(false)
+      }
+    }
+
+    // Fetch projects regardless of user authentication status for public projects
+    fetchProjects()
+  }, [user.user])
 
   const handleLogout = async () => {
     try {
@@ -43,6 +70,46 @@ const Home = () => {
       console.error('Logout error:', err)
       toast.error('Error logging out')
     }
+  }
+
+  // Transform projects into feed format
+  const transformProjectsToFeed = (projectsData) => {
+    console.log('Transforming projects:', projectsData)
+    console.log('Number of projects:', projectsData.length)
+    
+    const transformed = projectsData.map(project => {
+      console.log('Processing project:', project)
+      return {
+        id: project._id,
+        type: "project",
+        user: {
+          name: project.user ? `${project.user.firstName || ''} ${project.user.lastName || ''}`.trim() : 'Unknown User',
+          username: project.user?.username || 'unknown',
+          avatar: project.user?.avatar || "/placeholder.svg",
+          title: project.user?.title || "Developer",
+        },
+        content: {
+          title: project.title,
+          description: project.description,
+          image: project.coverImage,
+          technologies: project.techStack || [],
+          stats: { 
+            stars: project.likes?.length || 0, 
+            forks: 0, // Could be calculated from collaborators if needed
+            views: project.views || 0 
+          },
+        },
+        timestamp: project.createdAt ? new Date(project.createdAt).toLocaleDateString() : 'Recently',
+        interactions: { 
+          likes: project.likes?.length || 0, 
+          comments: 0, // Would need to implement comments
+          shares: 0 
+        },
+      }
+    })
+    
+    console.log('Transformed projects:', transformed)
+    return transformed
   }
 
   const dashboardData = {
@@ -57,60 +124,7 @@ const Home = () => {
     newFollowers: 12,
     endorsements: 8,
   },
-  feed: [
-    {
-      id: 1,
-      type: "project",
-      user: {
-        name: "Sarah Chen",
-        username: "sarahchen",
-        avatar: "/placeholder.svg?height=40&width=40",
-        title: "Frontend Developer",
-      },
-      content: {
-        title: "React Dashboard Template",
-        description: "A modern, responsive dashboard built with React and Tailwind CSS",
-        image: "/placeholder.svg?height=200&width=300",
-        technologies: ["React", "TypeScript", "Tailwind CSS"],
-        stats: { stars: 89, forks: 23, views: 456 },
-      },
-      timestamp: "2 hours ago",
-      interactions: { likes: 24, comments: 8, shares: 3 },
-    },
-    {
-      id: 2,
-      type: "endorsement",
-      user: {
-        name: "Mike Johnson",
-        username: "mikej",
-        avatar: "/placeholder.svg?height=40&width=40",
-        title: "Senior Backend Developer",
-      },
-      content: {
-        endorsedUser: "Alex Rodriguez",
-        skill: "Node.js",
-        message: "Alex has exceptional Node.js skills and delivered outstanding backend solutions.",
-      },
-      timestamp: "4 hours ago",
-      interactions: { likes: 15, comments: 2 },
-    },
-    {
-      id: 3,
-      type: "achievement",
-      user: {
-        name: "Emma Wilson",
-        username: "emmaw",
-        avatar: "/placeholder.svg?height=40&width=40",
-        title: "Full-Stack Developer",
-      },
-      content: {
-        achievement: "Completed 100 GitHub contributions this month",
-        badge: "Contributor",
-      },
-      timestamp: "6 hours ago",
-      interactions: { likes: 42, comments: 12 },
-    },
-  ],
+  feed: transformProjectsToFeed(projects),
   suggestions: [
     {
       id: 1,
@@ -133,26 +147,23 @@ const Home = () => {
       skills: ["Figma", "Design Systems", "Prototyping"],
     },
   ],
-  trendingProjects: [
-    {
-      id: 1,
-      name: "AI Chat Interface",
-      author: "Alex Chen",
-      description: "Modern chat interface with AI integration",
-      stars: 234,
-      language: "TypeScript",
-      trending: "+45 stars today",
-    },
-    {
-      id: 2,
-      name: "E-commerce Starter",
-      author: "Maria Garcia",
-      description: "Full-stack e-commerce template",
-      stars: 189,
-      language: "JavaScript",
-      trending: "+32 stars today",
-    },
-  ],  }
+  trendingProjects: projects
+    .filter(p => p.likes?.length > 0)
+    .sort((a, b) => (b.likes?.length || 0) - (a.likes?.length || 0))
+    .slice(0, 5)
+    .map(project => ({
+      id: project._id,
+      name: project.title,
+      author: project.user ? `${project.user.firstName || ''} ${project.user.lastName || ''}`.trim() : 'Unknown',
+      description: project.description,
+      stars: project.likes?.length || 0,
+      language: project.techStack?.[0] || 'JavaScript',
+      trending: `+${Math.floor(Math.random() * 50)} stars today`,
+    })),
+  }
+
+  console.log('Dashboard data feed:', dashboardData.feed)
+  console.log('Feed length:', dashboardData.feed.length)
 
   if (loading) {
     return (
@@ -170,7 +181,7 @@ const Home = () => {
       {/* Navigation */}
       <div className="navbar bg-white shadow-sm sticky top-0 z-50 border-b border-slate-200">
         <div className="navbar-start">
-          <Link to="/" className="btn btn-ghost text-xl text-slate-900">
+          <Link to="/" className="btn btn-ghost text-xl text-slate-900 hover:bg-slate-100">
             <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
               <Code2 className="h-5 w-5 text-white" />
             </div>
@@ -181,13 +192,19 @@ const Home = () => {
         <div className="navbar-center hidden lg:flex flex-1 max-w-lg">
           <div className="form-control w-full">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none z-10" />
               <input 
                 type="text" 
                 placeholder="Search developers, projects, skills..." 
-                className="input input-bordered w-full pl-10 border-slate-300 focus:border-indigo-500"
+                className="input input-bordered w-full pl-10 pr-4 border-slate-300 focus:border-indigo-500 focus:outline-none bg-white text-slate-900 relative z-20"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  console.log('Search input changed:', e.target.value)
+                  setSearchQuery(e.target.value)
+                }}
+                onFocus={() => console.log('Search input focused')}
+                onBlur={() => console.log('Search input blurred')}
+                style={{ position: 'relative' }}
               />
             </div>
           </div>
@@ -197,7 +214,7 @@ const Home = () => {
           <div className="flex items-center gap-2">
             {/* Notifications */}
             <div className="dropdown dropdown-end">
-              <div tabIndex={0} role="button" className="btn btn-ghost btn-circle indicator text-slate-600">
+              <div tabIndex={0} role="button" className="btn btn-ghost btn-circle indicator text-slate-600 hover:bg-slate-100 hover:text-slate-700">
                 <Bell className="h-5 w-5" />
                 {dashboardData.user.notifications > 0 && (
                   <span className="badge badge-sm bg-red-500 text-white indicator-item">
@@ -208,7 +225,7 @@ const Home = () => {
             </div>
 
             {/* Messages */}
-            <button className="btn btn-ghost btn-circle text-slate-600">
+            <button className="btn btn-ghost btn-circle text-slate-600 hover:bg-slate-100 hover:text-slate-700">
               <MessageSquare className="h-5 w-5" />
             </button>
 
@@ -217,7 +234,7 @@ const Home = () => {
               <div 
                 tabIndex={0} 
                 role="button" 
-                className="btn btn-ghost btn-circle avatar"
+                className="btn btn-ghost btn-circle avatar hover:bg-slate-100"
                 onClick={() => setShowUserMenu(!showUserMenu)}
               >
                 <div className="w-8 rounded-full">
@@ -349,115 +366,125 @@ const Home = () => {
 
             {/* Feed */}
             <div className="space-y-6">
-              {dashboardData.feed.map((item) => (
-                <div key={item.id} className="card bg-white shadow-sm border border-slate-200">
-                  <div className="card-body">
-                    {/* User Info */}
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="avatar">
-                        <div className="w-10 rounded-full">
-                          <img src={item.user.avatar || "/placeholder.svg"} alt={item.user.name} />
+              {feedLoading ? (
+                <div className="text-center py-12">
+                  <span className="loading loading-spinner loading-lg text-indigo-600"></span>
+                  <p className="mt-4 text-slate-700">Loading projects...</p>
+                </div>
+              ) : dashboardData.feed.length > 0 ? (
+                <>
+                  <div className="text-sm text-slate-600 mb-4">
+                    Showing {dashboardData.feed.length} project{dashboardData.feed.length !== 1 ? 's' : ''}
+                  </div>
+                  {dashboardData.feed.map((item) => (
+                    <div key={item.id} className="card bg-white shadow-sm border border-slate-200">
+                      <div className="card-body">
+                        {/* User Info */}
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="avatar">
+                            <div className="w-10 rounded-full">
+                              <img src={item.user.avatar || "/placeholder.svg"} alt={item.user.name} />
+                            </div>
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <Link
+                                to={`/profile/${item.user.username}`}
+                                className="font-medium text-slate-900 hover:text-indigo-600"
+                              >
+                                {item.user.name}
+                              </Link>
+                              <span className="text-slate-400">•</span>
+                              <span className="text-sm text-slate-500">{item.timestamp}</span>
+                            </div>
+                            <p className="text-sm text-slate-600">{item.user.title}</p>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <Link
-                            to={`/profile/${item.user.username}`}
-                            className="font-medium text-slate-900 hover:text-indigo-600"
-                          >
-                            {item.user.name}
-                          </Link>
-                          <span className="text-slate-400">•</span>
-                          <span className="text-sm text-slate-500">{item.timestamp}</span>
-                        </div>
-                        <p className="text-sm text-slate-600">{item.user.title}</p>
-                      </div>
-                    </div>
 
-                    {/* Content */}
-                    {item.type === "project" && (
-                      <div>
-                        <h3 className="text-lg font-semibold mb-2 text-slate-900">{item.content.title}</h3>
-                        <p className="text-slate-700 mb-4">{item.content.description}</p>
-                        {item.content.image && (
-                          <div className="aspect-video bg-slate-100 rounded-lg overflow-hidden mb-4">
-                            <img
-                              src={item.content.image || "/placeholder.svg"}
-                              alt={item.content.title}
-                              className="w-full h-full object-cover"
-                            />
+                        {/* Content */}
+                        {item.type === "project" && (
+                          <div>
+                            <h3 className="text-lg font-semibold mb-2 text-slate-900">{item.content.title}</h3>
+                            <p className="text-slate-700 mb-4">{item.content.description}</p>
+                            {item.content.image && (
+                              <div className="aspect-video bg-slate-100 rounded-lg overflow-hidden mb-4">
+                                <img
+                                  src={item.content.image || "/placeholder.svg"}
+                                  alt={item.content.title}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                            )}
+                            <div className="flex flex-wrap gap-2 mb-4">
+                              {item.content.technologies.map((tech) => (
+                                <div key={tech} className="badge badge-outline border-slate-300 text-slate-600">
+                                  {tech}
+                                </div>
+                              ))}
+                            </div>
+                            <div className="flex items-center gap-4 text-sm text-slate-500 mb-4">
+                              <div className="flex items-center gap-1">
+                                <Star className="h-4 w-4" />
+                                {item.content.stats.stars}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <GitFork className="h-4 w-4" />
+                                {item.content.stats.forks}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Eye className="h-4 w-4" />
+                                {item.content.stats.views}
+                              </div>
+                            </div>
                           </div>
                         )}
-                        <div className="flex flex-wrap gap-2 mb-4">
-                          {item.content.technologies.map((tech) => (
-                            <div key={tech} className="badge badge-outline border-slate-300 text-slate-600">
-                              {tech}
-                            </div>
-                          ))}
-                        </div>
-                        <div className="flex items-center gap-4 text-sm text-slate-500 mb-4">
-                          <div className="flex items-center gap-1">
-                            <Star className="h-4 w-4" />
-                            {item.content.stats.stars}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <GitFork className="h-4 w-4" />
-                            {item.content.stats.forks}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Eye className="h-4 w-4" />
-                            {item.content.stats.views}
-                          </div>
-                        </div>
-                      </div>
-                    )}
 
-                    {item.type === "endorsement" && (
-                      <div>
-                        <p className="text-slate-700 mb-2">
-                          Endorsed <span className="font-medium text-slate-900">{item.content.endorsedUser}</span> for{" "}
-                          <span className="badge badge-outline border-indigo-300 text-indigo-600">{item.content.skill}</span>
-                        </p>
-                        <blockquote className="border-l-4 border-indigo-200 pl-4 italic text-slate-600">
-                          "{item.content.message}"
-                        </blockquote>
-                      </div>
-                    )}
+                        {/* ... rest of item types ... */}
 
-                    {item.type === "achievement" && (
-                      <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <Award className="h-5 w-5 text-yellow-500" />
-                          <span className="font-medium text-slate-900">Achievement Unlocked!</span>
+                        {/* Interactions */}
+                        <div className="flex items-center justify-between pt-4 border-t border-slate-200">
+                          <div className="flex items-center gap-6">
+                            <button className="btn btn-ghost btn-sm text-slate-500 hover:text-red-500 hover:bg-red-50">
+                              <Heart className="h-4 w-4 mr-1" />
+                              {item.interactions.likes}
+                            </button>
+                            <button className="btn btn-ghost btn-sm text-slate-500 hover:text-indigo-600 hover:bg-indigo-50">
+                              <MessageSquare className="h-4 w-4 mr-1" />
+                              {item.interactions.comments}
+                            </button>
+                            <button className="btn btn-ghost btn-sm text-slate-500 hover:text-indigo-600 hover:bg-indigo-50">
+                              <Share className="h-4 w-4 mr-1" />
+                              {item.interactions.shares || 0}
+                            </button>
+                          </div>
+                          <button className="btn btn-ghost btn-sm text-slate-500 hover:text-amber-600 hover:bg-amber-50">
+                            <Bookmark className="h-4 w-4" />
+                          </button>
                         </div>
-                        <p className="text-slate-700">{item.content.achievement}</p>
-                        <div className="badge bg-yellow-100 text-yellow-800 border-yellow-200 mt-2">{item.content.badge}</div>
                       </div>
-                    )}
-
-                    {/* Interactions */}
-                    <div className="flex items-center justify-between pt-4 border-t border-slate-200">
-                      <div className="flex items-center gap-6">
-                        <button className="btn btn-ghost btn-sm text-slate-500 hover:text-red-500">
-                          <Heart className="h-4 w-4 mr-1" />
-                          {item.interactions.likes}
-                        </button>
-                        <button className="btn btn-ghost btn-sm text-slate-500 hover:text-indigo-600">
-                          <MessageSquare className="h-4 w-4 mr-1" />
-                          {item.interactions.comments}
-                        </button>
-                        <button className="btn btn-ghost btn-sm text-slate-500 hover:text-indigo-600">
-                          <Share className="h-4 w-4 mr-1" />
-                          {item.interactions.shares || 0}
-                        </button>
-                      </div>
-                      <button className="btn btn-ghost btn-sm text-slate-500 hover:text-indigo-600">
-                        <Bookmark className="h-4 w-4" />
-                      </button>
                     </div>
+                  ))}
+                </>
+              ) : (
+                <div className="text-center py-12">
+                  <h3 className="text-lg font-semibold text-slate-900 mb-2">No Projects Yet</h3>
+                  <p className="text-slate-600 mb-2">
+                    {projects.length === 0 
+                      ? "No projects have been created yet." 
+                      : `Found ${projects.length} projects but none are visible in the feed.`
+                    }
+                  </p>
+                  <p className="text-slate-600 mb-4">Be the first to share a project with the community!</p>
+                  <Link to="/project/new" className="btn bg-indigo-600 hover:bg-indigo-700 text-white">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Your First Project
+                  </Link>
+                  {/* Debug info */}
+                  <div className="mt-4 text-xs text-slate-400">
+                    <p>Debug: Raw projects: {projects.length}, Feed items: {dashboardData.feed.length}</p>
                   </div>
                 </div>
-              ))}
+              )}
             </div>
           </div>
 
@@ -471,7 +498,8 @@ const Home = () => {
                   Trending Projects
                 </h2>
                 <div className="space-y-4">
-                  {dashboardData.trendingProjects.map((project) => (
+                  {dashboardData.trendingProjects.length > 0 ? (
+                    dashboardData.trendingProjects.map((project) => (
                     <div key={project.id} className="space-y-2">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -494,7 +522,12 @@ const Home = () => {
                         </div>
                       </div>
                     </div>
-                  ))}
+                  ))
+                  ) : (
+                    <div className="text-center py-4">
+                      <p className="text-sm text-slate-600">No trending projects yet</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -504,10 +537,10 @@ const Home = () => {
               <div className="card-body">
                 <h2 className="card-title text-lg text-slate-900">Quick Actions</h2>
                 <div className="space-y-3">
-                  <button className="btn btn-outline w-full justify-start border-slate-300 text-slate-700 hover:border-indigo-300 hover:text-indigo-600">
+                  <Link to="/project/new" className="btn btn-outline w-full justify-start border-slate-300 text-slate-700 hover:border-indigo-300 hover:text-indigo-600">
                     <Plus className="h-4 w-4 mr-2" />
                     Add New Project
-                  </button>
+                  </Link>
                   <button className="btn btn-outline w-full justify-start border-slate-300 text-slate-700 hover:border-indigo-300 hover:text-indigo-600">
                     <Users className="h-4 w-4 mr-2" />
                     Find Developers

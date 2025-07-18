@@ -27,6 +27,7 @@ import {
   User,
   LogOut,
   Plus,
+  Eye,
 } from "lucide-react"
 import { selectUser } from "../features/auth/authSlice"
 import { logoutUser } from "../features/auth/authService"
@@ -104,11 +105,9 @@ const Profile = () => {
         const profileData = await profileAPI.getUserProfile(username)
         setProfileUser(profileData.user)
         
-        // Fetch user projects (only show on user's own profile)
-        if (isOwnProfile) {
-          const projectsData = await profileAPI.getUserProjects(username)
-          setUserProjects(projectsData.projects || [])
-        }
+        // Fetch user projects (shows public projects for others, all projects for own profile)
+        const projectsData = await profileAPI.getUserProjects(username)
+        setUserProjects(projectsData.data || [])
         
         // Fetch user stats
         const statsData = await profileAPI.getUserStats(username)
@@ -693,42 +692,46 @@ const Profile = () => {
                           {userProjects
                             .filter((p) => p.featured)
                             .map((project) => (
-                              <div key={project.id} className="card bg-white border border-slate-200">
+                              <div key={project._id} className="card bg-white border border-slate-200">
                               <div className="aspect-video bg-slate-100 rounded-t-lg overflow-hidden">
                                 <img
-                                  src={project.image || "/placeholder.svg"}
-                                  alt={project.name}
+                                  src={project.coverImage || "/placeholder.svg"}
+                                  alt={project.title}
                                   className="w-full h-full object-cover"
                                 />
                               </div>
                               <div className="card-body p-4">
-                                <h3 className="font-semibold text-slate-900 mb-2">{project.name}</h3>
+                                <h3 className="font-semibold text-slate-900 mb-2">{project.title}</h3>
                                 <p className="text-sm text-slate-600 mb-3">{project.description}</p>
                                 <div className="flex flex-wrap gap-1 mb-3">
-                                  {project.technologies.map((tech) => (
+                                  {project.techStack?.map((tech) => (
                                     <div key={tech} className="badge badge-outline border-slate-300 text-slate-600 text-xs">
                                       {tech}
                                     </div>
-                                  ))}
+                                  )) || []}
                                 </div>
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-4 text-sm text-slate-500">
                                     <div className="flex items-center gap-1">
                                       <Star className="h-4 w-4" />
-                                      {project.stars}
+                                      {project.likes?.length || 0}
                                     </div>
                                     <div className="flex items-center gap-1">
-                                      <GitFork className="h-4 w-4" />
-                                      {project.forks}
+                                      <Eye className="h-4 w-4" />
+                                      {project.views || 0}
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2">
-                                    <Link to={project.liveUrl} className="btn btn-ghost btn-sm">
-                                      <ExternalLink className="h-4 w-4" />
-                                    </Link>
-                                    <Link to={project.githubUrl} className="btn btn-ghost btn-sm">
-                                      <Github className="h-4 w-4" />
-                                    </Link>
+                                    {project.liveUrl && (
+                                      <a href={project.liveUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm">
+                                        <ExternalLink className="h-4 w-4" />
+                                      </a>
+                                    )}
+                                    {project.githubUrl && (
+                                      <a href={project.githubUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm">
+                                        <Github className="h-4 w-4" />
+                                      </a>
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -737,7 +740,7 @@ const Profile = () => {
                         </div>
                       ) : (
                         <div className="text-center py-8">
-                          <p className="text-slate-600">Projects are only visible on user's own profile</p>
+                          <p className="text-slate-600">No featured projects yet</p>
                         </div>
                       )}
                     </div>
@@ -775,73 +778,70 @@ const Profile = () => {
 
               {activeTab === 'projects' && (
                 <div className="space-y-6">
-                  {isOwnProfile ? (
-                    userProjects.length > 0 ? (
-                      userProjects.map((project) => (
-                    <div key={project.id} className="card bg-white shadow-sm border border-slate-200">
-                      <div className="card-body p-6">
-                        <div className="flex flex-col md:flex-row md:gap-6">
-                          <div className="md:w-1/3 mb-4 md:mb-0">
-                            <div className="aspect-video bg-slate-100 rounded-lg overflow-hidden">
-                              <img
-                                src={project.image || "/placeholder.svg"}
-                                alt={project.name}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                          </div>
-                          <div className="md:w-2/3">
-                            <div className="flex items-start justify-between mb-2">
-                              <h3 className="text-xl font-semibold text-slate-900">{project.name}</h3>
-                              {project.featured && (
-                                <div className="badge bg-indigo-100 text-indigo-800 border-indigo-200">Featured</div>
-                              )}
-                            </div>
-                            <p className="text-slate-600 mb-4">{project.description}</p>
-                            <div className="flex flex-wrap gap-2 mb-4">
-                              {project.technologies.map((tech) => (
-                                <div key={tech} className="badge badge-outline border-slate-300 text-slate-600">
-                                  {tech}
-                                </div>
-                              ))}
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-6 text-sm text-slate-500">
-                                <div className="flex items-center gap-1">
-                                  <Star className="h-4 w-4" />
-                                  {project.stars} stars
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <GitFork className="h-4 w-4" />
-                                  {project.forks} forks
-                                </div>
+                  {userProjects.length > 0 ? (
+                    userProjects.map((project) => (
+                      <div key={project._id} className="card bg-white shadow-sm border border-slate-200">
+                        <div className="card-body p-6">
+                          <div className="flex flex-col md:flex-row md:gap-6">
+                            <div className="md:w-1/3 mb-4 md:mb-0">
+                              <div className="aspect-video bg-slate-100 rounded-lg overflow-hidden">
+                                <img
+                                  src={project.coverImage || "/placeholder.svg"}
+                                  alt={project.title}
+                                  className="w-full h-full object-cover"
+                                />
                               </div>
-                              <div className="flex items-center gap-2">
-                                <Link to={project.liveUrl} className="btn btn-outline btn-sm border-slate-300">
-                                  <ExternalLink className="h-4 w-4 mr-2" />
-                                  Live Demo
-                                </Link>
-                                <Link to={project.githubUrl} className="btn btn-outline btn-sm border-slate-300">
-                                  <Github className="h-4 w-4 mr-2" />
-                                  Code
-                                </Link>
+                            </div>
+                            <div className="md:w-2/3">
+                              <div className="flex items-start justify-between mb-2">
+                                <h3 className="text-xl font-semibold text-slate-900">{project.title}</h3>
+                                {project.featured && (
+                                  <div className="badge bg-indigo-100 text-indigo-800 border-indigo-200">Featured</div>
+                                )}
+                              </div>
+                              <p className="text-slate-600 mb-4">{project.description}</p>
+                              <div className="flex flex-wrap gap-2 mb-4">
+                                {project.techStack?.map((tech) => (
+                                  <div key={tech} className="badge badge-outline border-slate-300 text-slate-600">
+                                    {tech}
+                                  </div>
+                                )) || []}
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-6 text-sm text-slate-500">
+                                  <div className="flex items-center gap-1">
+                                    <Star className="h-4 w-4" />
+                                    {project.likes?.length || 0} likes
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <Eye className="h-4 w-4" />
+                                    {project.views || 0} views
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {project.liveUrl && (
+                                    <a href={project.liveUrl} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm border-slate-300">
+                                      <ExternalLink className="h-4 w-4 mr-2" />
+                                      Live Demo
+                                    </a>
+                                  )}
+                                  {project.githubUrl && (
+                                    <a href={project.githubUrl} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm border-slate-300">
+                                      <Github className="h-4 w-4 mr-2" />
+                                      Code
+                                    </a>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-12">
-                        <h3 className="text-lg font-semibold text-slate-900 mb-2">No Projects Found</h3>
-                        <p className="text-slate-600">No projects have been created yet.</p>
-                      </div>
-                    )
+                    ))
                   ) : (
                     <div className="text-center py-12">
-                      <h3 className="text-lg font-semibold text-slate-900 mb-2">Projects Private</h3>
-                      <p className="text-slate-600">Projects are only visible on the user's own profile.</p>
+                      <h3 className="text-lg font-semibold text-slate-900 mb-2">No Projects Found</h3>
+                      <p className="text-slate-600">No projects have been created yet.</p>
                     </div>
                   )}
                 </div>

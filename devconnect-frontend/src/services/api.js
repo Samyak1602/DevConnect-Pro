@@ -192,6 +192,16 @@ export const profileAPI = {
 
 // Projects API for profile-related functionality
 export const projectsAPI = {
+  getAllProjects: async (params = {}) => {
+    try {
+      const queryParams = new URLSearchParams(params).toString()
+      const response = await api.get(`/projects${queryParams ? `?${queryParams}` : ''}`)
+      return response.data
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to fetch projects' }
+    }
+  },
+
   createProject: async (projectData) => {
     try {
       const response = await api.post('/projects', projectData)
@@ -225,6 +235,41 @@ export const projectsAPI = {
       return response.data
     } catch (error) {
       throw error.response?.data || { message: 'Failed to fetch project' }
+    }
+  }
+}
+
+// Upload API for file uploads
+export const uploadAPI = {
+  uploadAvatar: async (file) => {
+    try {
+      const formData = new FormData()
+      formData.append('avatar', file)
+      
+      const response = await api.post('/uploads/avatar', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      })
+      return response.data
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to upload avatar' }
+    }
+  },
+
+  uploadProjectCover: async (projectId, file) => {
+    try {
+      const formData = new FormData()
+      formData.append('coverImage', file)
+      
+      const response = await api.post(`/uploads/project/${projectId}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      })
+      return response.data
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to upload cover image' }
     }
   }
 }

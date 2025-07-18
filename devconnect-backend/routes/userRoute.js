@@ -19,7 +19,7 @@ router.put('/me', authMiddleware(), updateMe);
 
 // Profile routes (some require auth, some don't)
 router.get('/:username', authMiddleware(false), getUserByUsername); // Optional auth
-router.get('/:username/projects', authMiddleware(), getUserProjects); // Requires auth
+router.get('/:username/projects', authMiddleware(false), getUserProjects); // Optional auth - shows public projects or all if own profile
 router.get('/:username/stats', getUserStats); // Public
 router.post('/:username/follow', authMiddleware(), followUser); // Requires auth
 router.delete('/:username/follow', authMiddleware(), unfollowUser); // Requires auth
