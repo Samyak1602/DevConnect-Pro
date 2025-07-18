@@ -15,7 +15,7 @@ import {
   Trash2,
   Camera,
 } from "lucide-react"
-import { Link, useNavigate } from "react-router-dom"
+import { Link, useNavigate, useParams } from "react-router-dom"
 import { useState, useEffect } from "react"
 import { useSelector } from "react-redux"
 import { selectUser, selectIsAuthenticated } from "../features/auth/authSlice"
@@ -139,6 +139,7 @@ const initialProjectData = {
 
 export default function ProjectEdit() {
   const navigate = useNavigate()
+  const { projectId } = useParams() // Get project ID from URL params
   const currentUser = useSelector(selectUser)
   const isAuthenticated = useSelector(selectIsAuthenticated)
   const [projectData, setProjectData] = useState(initialProjectData)
@@ -152,6 +153,95 @@ export default function ProjectEdit() {
   const [isLoading, setIsLoading] = useState(false)
   const [uploadingCover, setUploadingCover] = useState(false)
   const [coverImagePreview, setCoverImagePreview] = useState("")
+
+  // Load existing project data if editing
+  useEffect(() => {
+    const loadProjectData = async () => {
+      if (!projectId) return
+      
+      try {
+        setIsLoading(true)
+        console.log('Loading project data for:', projectId, 'Current user:', currentUser?.id)
+        const response = await projectsAPI.getProjectById(projectId)
+        const project = response.data
+        
+        // Check if current user owns this project
+        if (project.user._id !== currentUser?.id) {
+          toast.error('You can only edit your own projects')
+          navigate('/profile')
+          return
+        }
+
+        // Transform backend data to form format
+        const transformedData = {
+          basic: {
+            title: project.title || "",
+            description: project.description || "",
+            category: project.category || "",
+            status: project.status || "In Development",
+            tags: project.tags || [],
+            featured: project.featured || false,
+          },
+          details: {
+            longDescription: project.longDescription || "",
+            features: project.features || [],
+            challenges: project.challenges || "",
+            learnings: project.learnings || "",
+            futureEnhancements: project.futureEnhancements || "",
+          },
+          technical: {
+            technologies: project.techStack || [],
+            architecture: project.architecture || "",
+            deployment: project.deployment || "",
+            database: project.database || "",
+            apiDocumentation: project.apiDocumentation || "",
+          },
+          links: {
+            liveUrl: project.liveUrl || "",
+            githubUrl: project.githubUrl || "",
+            documentationUrl: project.documentationUrl || "",
+            additionalLinks: project.additionalLinks || [],
+          },
+          media: {
+            screenshots: project.screenshots || [],
+            videos: project.videos || [],
+            logo: project.logo || "",
+            coverImage: project.coverImage || "",
+            coverImageFile: null,
+          },
+          collaboration: {
+            isOpenSource: project.isOpenSource !== undefined ? project.isOpenSource : true,
+            acceptingContributions: project.acceptingContributions || false,
+            collaborators: project.collaborators || [],
+            license: project.license || "MIT",
+          },
+          visibility: {
+            isPublic: project.isPublic !== undefined ? project.isPublic : true,
+            showInPortfolio: project.showInPortfolio !== undefined ? project.showInPortfolio : true,
+            allowComments: project.allowComments !== undefined ? project.allowComments : true,
+          },
+        }
+
+        setProjectData(transformedData)
+        
+        // Set cover image preview if exists
+        if (project.coverImage) {
+          setCoverImagePreview(project.coverImage)
+        }
+        
+      } catch (error) {
+        console.error('Error loading project:', error)
+        toast.error('Failed to load project data')
+        navigate('/profile')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    if (projectId) {
+      loadProjectData()
+    }
+  }, [projectId, currentUser?.id, navigate])
 
   // Check authentication on component mount
   useEffect(() => {
@@ -332,7 +422,7 @@ export default function ProjectEdit() {
     try {
       setIsLoading(true)
       
-      // First create the project
+      // Prepare transformed data
       const transformedData = {
         // Basic information
         title: projectData.basic.title,
@@ -362,8 +452,8 @@ export default function ProjectEdit() {
         documentationUrl: projectData.links.documentationUrl,
         additionalLinks: projectData.links.additionalLinks,
         
-        // Media (without file, we'll upload that separately)
-        coverImage: "", // Will be updated after upload
+        // Media (keep existing cover image if no new file)
+        coverImage: projectData.media.coverImage,
         screenshots: projectData.media.screenshots,
         videos: projectData.media.videos,
         logo: projectData.media.logo,
@@ -380,32 +470,40 @@ export default function ProjectEdit() {
         allowComments: projectData.visibility.allowComments,
       }
 
-      const response = await projectsAPI.createProject(transformedData)
+      let response
+      let currentProjectId = projectId
+
+      if (projectId) {
+        // Update existing project
+        response = await projectsAPI.updateProject(projectId, transformedData)
+      } else {
+        // Create new project
+        response = await projectsAPI.createProject(transformedData)
+        currentProjectId = response.data._id
+      }
       
       if (response.success) {
-        const projectId = response.data._id
-        
         // Upload cover image if one was selected
         if (projectData.media.coverImageFile) {
           try {
-            const uploadResponse = await uploadAPI.uploadProjectCover(projectId, projectData.media.coverImageFile)
+            const uploadResponse = await uploadAPI.uploadProjectCover(currentProjectId, projectData.media.coverImageFile)
             if (uploadResponse.success) {
-              toast.success('Project saved with cover image successfully!')
+              toast.success(`Project ${projectId ? 'updated' : 'saved'} with cover image successfully!`)
             }
           } catch (uploadError) {
             console.error('Error uploading cover image:', uploadError)
-            toast.success('Project saved, but cover image upload failed')
+            toast.success(`Project ${projectId ? 'updated' : 'saved'}, but cover image upload failed`)
           }
         } else {
-          toast.success('Project saved as draft successfully!')
+          toast.success(`Project ${projectId ? 'updated' : 'saved'} as draft successfully!`)
         }
         
         setHasUnsavedChanges(false)
         navigate('/home')
       }
     } catch (error) {
-      console.error('Error saving project:', error)
-      toast.error(error.message || 'Failed to save project')
+      console.error(`Error ${projectId ? 'updating' : 'saving'} project:`, error)
+      toast.error(error.message || `Failed to ${projectId ? 'update' : 'save'} project`)
     } finally {
       setIsLoading(false)
     }
@@ -429,7 +527,7 @@ export default function ProjectEdit() {
 
       setIsLoading(true)
 
-      // First create the project
+      // Prepare transformed data
       const transformedData = {
         // Basic information
         title: projectData.basic.title,
@@ -459,8 +557,8 @@ export default function ProjectEdit() {
         documentationUrl: projectData.links.documentationUrl,
         additionalLinks: projectData.links.additionalLinks,
         
-        // Media (without file, we'll upload that separately)
-        coverImage: "", // Will be updated after upload
+        // Media (keep existing cover image if no new file)
+        coverImage: projectData.media.coverImage,
         screenshots: projectData.media.screenshots,
         videos: projectData.media.videos,
         logo: projectData.media.logo,
@@ -477,32 +575,40 @@ export default function ProjectEdit() {
         allowComments: projectData.visibility.allowComments,
       }
 
-      const response = await projectsAPI.createProject(transformedData)
+      let response
+      let currentProjectId = projectId
+
+      if (projectId) {
+        // Update existing project
+        response = await projectsAPI.updateProject(projectId, transformedData)
+      } else {
+        // Create new project
+        response = await projectsAPI.createProject(transformedData)
+        currentProjectId = response.data._id
+      }
       
       if (response.success) {
-        const projectId = response.data._id
-        
         // Upload cover image if one was selected
         if (projectData.media.coverImageFile) {
           try {
-            const uploadResponse = await uploadAPI.uploadProjectCover(projectId, projectData.media.coverImageFile)
+            const uploadResponse = await uploadAPI.uploadProjectCover(currentProjectId, projectData.media.coverImageFile)
             if (uploadResponse.success) {
-              toast.success('Project published with cover image successfully!')
+              toast.success(`Project ${projectId ? 'updated and published' : 'published'} with cover image successfully!`)
             }
           } catch (uploadError) {
             console.error('Error uploading cover image:', uploadError)
-            toast.success('Project published, but cover image upload failed')
+            toast.success(`Project ${projectId ? 'updated and published' : 'published'}, but cover image upload failed`)
           }
         } else {
-          toast.success('Project published successfully!')
+          toast.success(`Project ${projectId ? 'updated and published' : 'published'} successfully!`)
         }
         
         setHasUnsavedChanges(false)
         navigate('/home')
       }
     } catch (error) {
-      console.error('Error publishing project:', error)
-      toast.error(error.message || 'Failed to publish project')
+      console.error(`Error ${projectId ? 'updating' : 'publishing'} project:`, error)
+      toast.error(error.message || `Failed to ${projectId ? 'update' : 'publish'} project`)
     } finally {
       setIsLoading(false)
     }
@@ -569,7 +675,9 @@ export default function ProjectEdit() {
 
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Add New Project</h1>
+          <h1 className="text-3xl font-bold text-gray-900">
+            {projectId ? 'Edit Project' : 'Add New Project'}
+          </h1>
           <p className="text-gray-600 mt-2">Showcase your work and share it with the developer community</p>
           {hasUnsavedChanges && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4 flex items-center">

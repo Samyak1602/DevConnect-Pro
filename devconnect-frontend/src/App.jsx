@@ -56,6 +56,11 @@ const App = () => {
             <ProjectEdit />
           </ProtectedRoute>
         } />
+        <Route path="/project/edit/:projectId" element={
+          <ProtectedRoute>
+            <ProjectEdit />
+          </ProtectedRoute>
+        } />
       </Routes>
     </div>
   )

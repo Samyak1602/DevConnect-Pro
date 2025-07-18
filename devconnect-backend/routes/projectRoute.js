@@ -37,8 +37,8 @@ router.get('/tech/:tech', getProjectsByTech);
 
 // @desc    Get single project by ID
 // @route   GET /api/projects/:id
-// @access  Public
-router.get('/:id', getProject);
+// @access  Public (with optional auth for private projects)
+router.get('/:id', authMiddleware(false), getProject);
 
 // @desc    Update project
 // @route   PUT /api/projects/:id

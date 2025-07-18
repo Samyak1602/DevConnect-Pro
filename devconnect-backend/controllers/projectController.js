@@ -125,6 +125,15 @@ exports.getProject = async (req, res, next) => {
             return next(new ErrorResponse('Project not found', 404));
         }
 
+        // Debug logging
+        console.log('getProject Debug:', {
+            projectId: req.params.id,
+            projectUserId: project.user._id.toString(),
+            currentUserId: req.user?.id,
+            isPublic: project.isPublic,
+            hasUser: !!req.user
+        });
+
         // Check if project is private and user is not the owner
         if (!project.isPublic && (!req.user || req.user.id !== project.user._id.toString())) {
             return next(new ErrorResponse('Not authorized to view this project', 403));
