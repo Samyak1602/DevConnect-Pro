@@ -9,7 +9,7 @@ const {
 } = require('../controllers/uploadController');
 
 const authMiddleware = require('../middlewares/authMiddleware');
-const { uploadAvatar: avatarUpload, uploadProjectImage } = require('../config/cloudinary');
+const { uploadAvatar: avatarUpload, createUploadProjectImage, configureCloudinary } = require('../config/cloudinary');
 
 // @desc    Upload avatar
 // @route   POST /api/uploads/avatar
@@ -25,7 +25,12 @@ router.post('/avatar',
 // @access  Private
 router.post('/project/:projectId', 
   authMiddleware(), 
-  uploadProjectImage.single('coverImage'), 
+  (req, res, next) => {
+    // Configure Cloudinary and create upload middleware
+    configureCloudinary();
+    const uploadProjectImage = createUploadProjectImage();
+    uploadProjectImage.single('coverImage')(req, res, next);
+  },
   uploadProjectCover
 );
 

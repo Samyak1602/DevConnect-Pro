@@ -7,6 +7,7 @@ const userRoutes = require('./routes/userRoute');
 const projectRoutes = require('./routes/projectRoute');
 const uploadRoutes = require('./routes/uploadRoute');
 const connectDB = require('./config/db');
+const ErrorResponse = require('./utils/errorResponse');
 
 // Load environment variables
 dotenv.config();
