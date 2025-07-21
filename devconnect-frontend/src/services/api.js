@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const API_BASE_URL = 'https://devconnect-pro-g4q1.onrender.com'
+const API_BASE_URL = 'https://devconnect-pro-g4q1.onrender.com/api'
 
 // Create axios instance with default config
 const api = axios.create({
