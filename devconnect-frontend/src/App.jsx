@@ -7,6 +7,7 @@ import Home from './pages/Home'
 import Profile from './pages/Profile'
 import ProfileEdit from './pages/ProfileEdit'
 import ProjectEdit from './pages/ProjectEdit'
+import MessagePage from './pages/MessagePage'
 import ProtectedRoute from './components/ProtectedRoute'
 import { Route, Routes } from 'react-router-dom'
 import { initializeAuth, initializeApiStore } from './features/auth/authService'
@@ -59,6 +60,11 @@ const App = () => {
         <Route path="/project/edit/:projectId" element={
           <ProtectedRoute>
             <ProjectEdit />
+          </ProtectedRoute>
+        } />
+        <Route path="/messages" element={
+          <ProtectedRoute>
+            <MessagePage />
           </ProtectedRoute>
         } />
       </Routes>

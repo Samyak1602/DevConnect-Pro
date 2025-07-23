@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const API_BASE_URL = 'https://devconnect-pro-g4q1.onrender.com/api'
+const API_BASE_URL = 'http://localhost:5000/api'
 
 // Create axios instance with default config
 const api = axios.create({
@@ -270,6 +270,39 @@ export const uploadAPI = {
       return response.data
     } catch (error) {
       throw error.response?.data || { message: 'Failed to upload cover image' }
+    }
+  }
+}
+
+// Messages API for chat functionality
+export const messagesAPI = {
+  // Get all users for sidebar (excluding current user)
+  getUsersForSidebar: async () => {
+    try {
+      const response = await api.get('/messages/users')
+      return response.data
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to fetch users' }
+    }
+  },
+
+  // Get messages between current user and another user
+  getMessages: async (userId) => {
+    try {
+      const response = await api.get(`/messages/${userId}`)
+      return response.data
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to fetch messages' }
+    }
+  },
+
+  // Send a message to another user
+  sendMessage: async (userId, messageData) => {
+    try {
+      const response = await api.post(`/messages/send/${userId}`, messageData)
+      return response.data
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to send message' }
     }
   }
 }

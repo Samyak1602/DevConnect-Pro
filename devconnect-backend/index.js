@@ -6,6 +6,7 @@ const authRoute = require('./routes/authRoute');
 const userRoutes = require('./routes/userRoute');
 const projectRoutes = require('./routes/projectRoute');
 const uploadRoutes = require('./routes/uploadRoute');
+const messageRoutes = require('./routes/messageRoute');
 const connectDB = require('./config/db');
 const ErrorResponse = require('./utils/errorResponse');
 
@@ -26,6 +27,7 @@ app.use('/api/auth', authRoute);
 app.use('/api/users', userRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/uploads', uploadRoutes);
+app.use("/api/messages",messageRoutes);
 
 // Basic route
 app.get('/', (req, res) => {

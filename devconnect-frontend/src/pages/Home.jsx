@@ -225,9 +225,9 @@ const Home = () => {
             </div>
 
             {/* Messages */}
-            <button className="btn btn-ghost btn-circle text-slate-600 hover:bg-slate-100 hover:text-slate-700">
+            <Link to="/messages" className="btn btn-ghost btn-circle text-slate-600 hover:bg-slate-100 hover:text-slate-700">
               <MessageSquare className="h-5 w-5" />
-            </button>
+            </Link>
 
             {/* User Menu */}
             <div className="dropdown dropdown-end">

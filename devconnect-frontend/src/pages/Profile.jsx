@@ -284,9 +284,9 @@ const Profile = () => {
             <button className="btn btn-ghost btn-circle text-slate-600 hover:text-slate-700 hover:bg-slate-100">
               <Bell className="h-5 w-5" />
             </button>
-            <button className="btn btn-ghost btn-circle text-slate-600 hover:text-slate-700 hover:bg-slate-100">
+            <Link to="/messages" className="btn btn-ghost btn-circle text-slate-600 hover:text-slate-700 hover:bg-slate-100">
               <MessageSquare className="h-5 w-5" />
-            </button>
+            </Link>
             <button className="btn btn-ghost btn-circle text-slate-600 hover:text-slate-700 hover:bg-slate-100">
               <Share className="h-5 w-5" />
             </button>
@@ -457,10 +457,10 @@ const Profile = () => {
                         >
                           {isFollowing ? "Following" : "Follow"}
                         </button>
-                        <button className="btn btn-outline border-slate-300 text-slate-700">
+                        <Link to="/messages" className="btn btn-outline border-slate-300 text-slate-700">
                           <MessageSquare className="h-4 w-4 mr-2" />
                           Message
-                        </button>
+                        </Link>
                       </>
                     )}
                   </div>
