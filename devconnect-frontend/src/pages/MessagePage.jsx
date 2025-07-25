@@ -1,6 +1,8 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Link } from "react-router-dom"
 import { messagesAPI } from "../services/api"
+import { useSocket } from "../hooks/useSocket"
+import socketService from "../services/socketService"
 
 
 
@@ -11,6 +13,20 @@ export default function MessagePage() {
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [typingUsers, setTypingUsers] = useState(new Set())
+  const messagesEndRef = useRef(null)
+  
+  // Use the socket hook
+  const { onlineUsers } = useSocket()
+
+  // Auto-scroll to bottom when new messages arrive
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages])
 
   // Fetch all users for sidebar
   useEffect(() => {
@@ -45,16 +61,131 @@ export default function MessagePage() {
     fetchMessages()
   }, [selectedConversation])
 
+  // Socket event listeners
+  useEffect(() => {
+    // Listen for new messages
+    socketService.onNewMessage((message) => {
+      // Get current user to avoid duplicates for sender
+      const currentUser = JSON.parse(localStorage.getItem('user'))
+      const messageSenderId = typeof message.senderId === 'object' 
+        ? message.senderId._id 
+        : message.senderId
+      const isMessageFromMe = messageSenderId === currentUser?.id
+      
+      // Only add message if it's NOT from the current user (to avoid duplicates)
+      // The sender already sees their message via optimistic update
+      if (!isMessageFromMe) {
+        setMessages(prev => {
+          // Check if message already exists to avoid duplicates
+          const messageExists = prev.find(msg => msg._id === message._id)
+          if (messageExists) return prev
+          return [...prev, message]
+        })
+      }
+    })
+
+    // Listen for typing indicators
+    socketService.onUserTyping(({ senderId, isTyping }) => {
+      setTypingUsers(prev => {
+        const newTypingUsers = new Set(prev)
+        if (isTyping) {
+          newTypingUsers.add(senderId)
+        } else {
+          newTypingUsers.delete(senderId)
+        }
+        return newTypingUsers
+      })
+      
+      // Clear typing indicator after 3 seconds
+      if (isTyping) {
+        setTimeout(() => {
+          setTypingUsers(prev => {
+            const newTypingUsers = new Set(prev)
+            newTypingUsers.delete(senderId)
+            return newTypingUsers
+          })
+        }, 3000)
+      }
+    })
+
+    // Cleanup listeners on unmount
+    return () => {
+      socketService.offNewMessage()
+      socketService.offUserTyping()
+    }
+  }, [])
+
+  // Join/leave conversation rooms
+  useEffect(() => {
+    if (selectedConversation) {
+      socketService.joinConversation(selectedConversation._id)
+      
+      return () => {
+        socketService.leaveConversation(selectedConversation._id)
+      }
+    }
+  }, [selectedConversation])
+
   const handleSendMessage = async () => {
     if (newMessage.trim() && selectedConversation) {
+      const currentUser = JSON.parse(localStorage.getItem('user'))
+      const tempMessage = {
+        _id: Date.now().toString(), // Temporary ID
+        senderId: currentUser?.id,
+        receiverId: selectedConversation._id,
+        text: newMessage,
+        createdAt: new Date().toISOString(),
+        pending: true // Mark as pending
+      }
+      const messageText = newMessage
+
       try {
-        const messageData = await messagesAPI.sendMessage(selectedConversation._id, {
-          text: newMessage
-        })
-        setMessages(prev => [...prev, messageData])
+        // Optimistic update - add message to UI immediately
+        setMessages(prev => [...prev, tempMessage])
         setNewMessage("")
+
+        // Send message to backend
+        const messageData = await messagesAPI.sendMessage(selectedConversation._id, {
+          text: messageText
+        })
+
+        // Replace temporary message with real message from server
+        setMessages(prev => prev.map(msg => 
+          msg._id === tempMessage._id ? messageData : msg
+        ))
       } catch (err) {
+        console.error('Failed to send message:', err)
+        // Remove temporary message on error
+        setMessages(prev => prev.filter(msg => msg._id !== tempMessage._id))
         setError(err.message || 'Failed to send message')
+        setNewMessage(messageText) // Restore message text
+      }
+    }
+  }
+
+  // Handle typing indicators
+  let typingTimeout = null
+  const handleTyping = (value) => {
+    setNewMessage(value)
+    
+    if (selectedConversation && value.trim()) {
+      // Emit typing start
+      socketService.emitTyping(selectedConversation._id, true)
+      
+      // Clear previous timeout
+      if (typingTimeout) {
+        clearTimeout(typingTimeout)
+      }
+      
+      // Set timeout to stop typing indicator
+      typingTimeout = setTimeout(() => {
+        socketService.emitTyping(selectedConversation._id, false)
+      }, 1000)
+    } else if (selectedConversation) {
+      // Stop typing immediately if input is empty
+      socketService.emitTyping(selectedConversation._id, false)
+      if (typingTimeout) {
+        clearTimeout(typingTimeout)
       }
     }
   }
@@ -131,12 +262,18 @@ export default function MessagePage() {
                           alt={user.name || user.username}
                           className="w-10 h-10 rounded-full"
                         />
-                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
+                        <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 border-2 border-white rounded-full ${
+                          onlineUsers.includes(user._id) ? 'bg-green-500' : 'bg-gray-400'
+                        }`}></div>
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
                           <p className="font-medium text-gray-900 truncate">{user.name || user.username}</p>
-                          <span className="text-xs text-gray-500">Online</span>
+                          <span className={`text-xs ${
+                            onlineUsers.includes(user._id) ? 'text-green-600' : 'text-gray-500'
+                          }`}>
+                            {onlineUsers.includes(user._id) ? 'Online' : 'Offline'}
+                          </span>
                         </div>
                         <p className="text-sm text-gray-600 truncate">{user.bio || user.title || 'Developer'}</p>
                         <p className="text-sm truncate mt-1 text-gray-500">
@@ -165,12 +302,19 @@ export default function MessagePage() {
                         alt={selectedConversation.name || selectedConversation.username}
                         className="w-10 h-10 rounded-full"
                       />
-                      <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
+                      <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 border-2 border-white rounded-full ${
+                        onlineUsers.includes(selectedConversation._id) ? 'bg-green-500' : 'bg-gray-400'
+                      }`}></div>
                     </div>
                     <div>
                       <h3 className="font-semibold text-gray-900">{selectedConversation.name || selectedConversation.username}</h3>
                       <p className="text-sm text-gray-600">{selectedConversation.bio || selectedConversation.title || 'Developer'}</p>
-                      <p className="text-xs text-green-600">Online</p>
+                      <p className={`text-xs ${
+                        onlineUsers.includes(selectedConversation._id) ? 'text-green-600' : 'text-gray-500'
+                      }`}>
+                        {typingUsers.has(selectedConversation._id) ? 'Typing...' : 
+                         onlineUsers.includes(selectedConversation._id) ? 'Online' : 'Offline'}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -206,31 +350,42 @@ export default function MessagePage() {
                       <p>No messages yet. Start the conversation!</p>
                     </div>
                   ) : (
-                    messages.map((message) => (
+                    messages.map((message) => {
+                      // Handle both string and object senderId formats
+                      const messageSenderId = typeof message.senderId === 'object' 
+                        ? message.senderId._id 
+                        : message.senderId
+                      const currentUser = JSON.parse(localStorage.getItem('user'))
+                      const isMyMessage = messageSenderId === currentUser?.id
+                      
+                      return (
                       <div
                         key={message._id}
-                        className={`flex ${message.senderId === selectedConversation._id ? "justify-start" : "justify-end"}`}
+                        className={`flex ${isMyMessage ? "justify-end" : "justify-start"}`}
                       >
                         <div
                           className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                            message.senderId === selectedConversation._id
-                              ? "bg-gray-100 text-gray-900" 
-                              : "bg-blue-600 text-white"
+                            isMyMessage
+                              ? "bg-blue-600 text-white" 
+                              : "bg-gray-100 text-gray-900"
                           }`}
                         >
                           <p className="text-sm">{message.text}</p>
                           <p className={`text-xs mt-1 ${
-                            message.senderId === selectedConversation._id
-                              ? "text-gray-500"
-                              : "text-blue-100" 
+                            isMyMessage
+                              ? "text-blue-100" 
+                              : "text-gray-500"
                           }`}>
                             {new Date(message.createdAt).toLocaleTimeString()}
                           </p>
                         </div>
                       </div>
-                    ))
+                      )
+                    })
                   )}
                 </div>
+                {/* Scroll reference */}
+                <div ref={messagesEndRef} />
               </div>
 
               {/* Message Input */}
@@ -246,9 +401,10 @@ export default function MessagePage() {
                       type="text"
                       placeholder="Type your message..."
                       value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
+                      onChange={(e) => handleTyping(e.target.value)}
                       onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
-                      className="w-full px-4 py-2 pr-12 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-2 pr-12 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+                      autoComplete="off"
                     />
                     <button className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 hover:bg-gray-100 rounded-full">
                       <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

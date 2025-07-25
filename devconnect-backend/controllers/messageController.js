@@ -1,6 +1,7 @@
 const { cloudinary } = require('../config/cloudinary');
 const Message = require('../models/Message');
-const User = require('../models/User')
+const User = require('../models/User');
+const { getSocketId } = require('../config/socket');
 const ErrorResponse = require('../utils/errorResponse');
 
 
@@ -60,7 +61,20 @@ exports.sendMessages = async(req,res,next) =>{
 
         await newMessage.save();
 
-        //todo : realtime functionality goes here
+        // Populate sender and receiver info for the real-time event
+        await newMessage.populate('senderId', 'username avatar');
+        await newMessage.populate('receiverId', 'username avatar');
+
+        // Real-time functionality: emit the new message to the receiver ONLY
+        const io = req.app.get('io');
+        const receiverSocketId = getSocketId(receiverId);
+        
+        if (receiverSocketId) {
+            // Send the message to the specific receiver
+            io.to(receiverSocketId).emit('newMessage', newMessage);
+        }
+
+        // Don't send to sender - they already have optimistic update
 
         res.status(201).json(newMessage);
     }catch(err){

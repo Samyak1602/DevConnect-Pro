@@ -2,18 +2,37 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const { createServer } = require('http');
+const { Server } = require('socket.io');
 const authRoute = require('./routes/authRoute');
 const userRoutes = require('./routes/userRoute');
 const projectRoutes = require('./routes/projectRoute');
 const uploadRoutes = require('./routes/uploadRoute');
 const messageRoutes = require('./routes/messageRoute');
 const connectDB = require('./config/db');
+const { initializeSocket } = require('./config/socket');
 const ErrorResponse = require('./utils/errorResponse');
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
+const server = createServer(app);
+
+// Configure Socket.IO with CORS
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:5173", // React dev server
+    methods: ["GET", "POST"],
+    credentials: true
+  }
+});
+
+// Initialize Socket.IO
+initializeSocket(io);
+
+// Make io accessible to other parts of the app
+app.set('io', io);
 
 // Connect to MongoDB
 connectDB();
@@ -67,8 +86,8 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
 
-module.exports = app;
+module.exports = { app, io };

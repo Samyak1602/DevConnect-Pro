@@ -12,11 +12,15 @@ import ProtectedRoute from './components/ProtectedRoute'
 import { Route, Routes } from 'react-router-dom'
 import { initializeAuth, initializeApiStore } from './features/auth/authService'
 import { selectIsAuthenticated } from './features/auth/authSlice'
+import { useSocket } from './hooks/useSocket'
 
 const App = () => {
   const dispatch = useDispatch()
   const store = useStore()
   const isAuthenticated = useSelector(selectIsAuthenticated)
+  
+  // Initialize socket connection
+  useSocket()
 
   useEffect(() => {
     console.log('App: Initializing authentication...')
