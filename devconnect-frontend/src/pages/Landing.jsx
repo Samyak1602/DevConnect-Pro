@@ -105,7 +105,7 @@ const Landing = () => {
                 Get Started
                 <Code2 className="ml-2 h-5 w-5" />
               </Link>
-              <button className="btn btn-outline btn-lg px-8 border-slate-300 hover:border-indigo-300">
+              <button className="btn btn-outline btn-lg px-8 border-slate-800 text-slate-800 hover:bg-slate-800 hover:text-white hover:border-slate-800 bg-white shadow-md">
                 <Github className="mr-2 h-5 w-5" />
                 Connect GitHub
               </button>

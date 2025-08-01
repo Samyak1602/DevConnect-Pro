@@ -1,5 +1,5 @@
 const { cloudinary } = require('../config/cloudinary');
-const Message = require('../models/Message');
+const Message = require('../models/message');
 const User = require('../models/User');
 const { getSocketId } = require('../config/socket');
 const ErrorResponse = require('../utils/errorResponse');
